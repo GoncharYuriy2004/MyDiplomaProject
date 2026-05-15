@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@layer theme {
+  :root {
+    /* Base colors */
+    --color-background: #f8fafc;
+    --color-foreground: #0f172a;
+
+    /* Primary (Manager) colors */
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-500: #3b82f6;
+    --color-primary-600: #2563eb;
+    --color-primary-900: #1e3a8a;
+
+    /* Secondary (Worker) colors */
+    --color-worker-50: #f0fdf4;
+    --color-worker-100: #dcfce7;
+    --color-worker-500: #22c55e;
+    --color-worker-600: #16a34a;
+    --color-worker-900: #14532d;
+  }
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Hide default browser eye icon for password inputs */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+  }
+}
+
+/* Theme classes to wrap layouts */
+.theme-manager {
+  --app-bg: #f8fafc;
+  --sidebar-bg: #0f172a;
+  --sidebar-text: #f8fafc;
+  --sidebar-hover: #1e293b;
+  --sidebar-active: #3b82f6;
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+}
+
+.theme-worker {
+  --app-bg: #f0fdf4;
+  --sidebar-bg: #14532d;
+  --sidebar-text: #f0fdf4;
+  --sidebar-hover: #166534;
+  --sidebar-active: #22c55e;
+  --accent-color: #22c55e;
+  --accent-hover: #16a34a;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}

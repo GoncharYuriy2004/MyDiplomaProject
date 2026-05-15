@@ -1,39 +1,757 @@
-from fastapi import FastAPI
-from pymongo import MongoClient
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List, Any
+from jose import JWTError, jwt
+from bson import ObjectId
+from datetime import datetime
 
-app = FastAPI()
+from dotenv import load_dotenv
+from auth_utils import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+    SECRET_KEY,
+    ALGORITHM,
+)
+import motor.motor_asyncio
+import os
 
-# 1. Разрешаем React (localhost:5173) обращаться к Python
+load_dotenv()
+
+app = FastAPI(title="IT-WMS API", version="1.0.0")
+
+# ── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 2. Подключение к MongoDB
-# Подключение к локальной MongoDB
-client = MongoClient("mongodb://localhost:27017/")
-db = client["my_diploma_db"]
-collection = db["items"]
+# ── Database ──────────────────────────────────────────────────────────────────
+MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME   = os.getenv("DB_NAME", "user_Diplom")
+client    = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)
+db        = client[DB_NAME]
 
-# Перевірка підключення
-try:
-    client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
-except Exception as e:
-    print(e)
+users_col        = db["users"]
+persons_col      = db["persons"]
+suppliers_col    = db["suppliers"]
+items_col        = db["mtak"]          # МтаК — матеріально-технічні цінності
+transactions_col = db["transactions"]
+documents_col    = db["documents"]
+procurement_col  = db["procurement_orders"]
 
-@app.get("/")
-def read_root():
-    return {"status": "Backend is running"}
+# ── External DB (DiplomDB — read requests, update status only) ────────────────
+diplom_db           = client["DiplomDB"]
+detail_requests_col = diplom_db["detail_requests"]
 
-@app.get("/data")
-def get_data():
-    data = list(collection.find({}, {"_id": 0})) 
-    return data
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROLE MAPPING  (API English ↔ DB Ukrainian)
+# ═══════════════════════════════════════════════════════════════════════════════
+_ROLE_TO_UA   = {"manager": "Менеджер", "worker": "Працівник", "admin": "Адміністратор"}
+_ROLE_FROM_UA = {"менеджер": "manager", "працівник": "worker", "адміністратор": "manager"}
+
+def _role_to_ua(role: str) -> str:
+    return _ROLE_TO_UA.get((role or "").lower(), role)
+
+def _role_from_ua(role: str) -> str:
+    return _ROLE_FROM_UA.get((role or "").lower(), role)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
+def to_oid(value: Optional[str]) -> Optional[ObjectId]:
+    if value is None:
+        return None
+    try:
+        return ObjectId(value)
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Invalid ObjectId: {value}")
+
+def safe_to_oid(value: Optional[str]):
+    """Convert to ObjectId if possible; keep as string otherwise (e.g. email-based user IDs)."""
+    if not value:
+        return None
+    try:
+        return ObjectId(value)
+    except Exception:
+        return value
+
+def _oid_str(v) -> Optional[str]:
+    return str(v) if isinstance(v, ObjectId) else (v if v else None)
+
+def serialize(doc: dict) -> dict:
+    """Generic serializer for transactions / documents."""
+    if doc is None:
+        return None
+    doc = dict(doc)
+    doc["_id"] = str(doc["_id"])
+    for key in ("supplier_id", "issued_by", "written_off_by",
+                "user_id", "document_id", "item_id", "created_by"):
+        if key in doc and isinstance(doc[key], ObjectId):
+            doc[key] = str(doc[key])
+    return doc
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COLLECTION FIELD MAPPERS  (diagram schema ↔ API schema)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── User ──────────────────────────────────────────────────────────────────────
+def user_from_db(doc: dict) -> dict:
+    """DB fields → API fields for User class."""
+    if doc is None:
+        return None
+    return {
+        "_id":       str(doc["_id"]),
+        "email":     doc.get("Логін", ""),
+        "role":      _role_from_ua(doc.get("Роль", "")),
+        "firstname": doc.get("firstname", ""),
+        "lastname":  doc.get("lastname",  ""),
+    }
+
+# ── Suppliers ─────────────────────────────────────────────────────────────────
+def supplier_to_db(data: dict) -> dict:
+    """API fields → DB Ukrainian fields for Suppliers class."""
+    return {
+        "Ім'я":             data.get("name", ""),
+        "Адреса":           data.get("address", ""),
+        "IBAN":             data.get("iban", ""),
+        "Контактна особа":  data.get("contact_person", ""),
+        "Електронна пошта": data.get("email", ""),
+        "Телеграма":        data.get("telegram", ""),
+        "Телефон":          data.get("phone", ""),
+        "edrpou":           data.get("edrpou", ""),  # extra field not in diagram
+    }
+
+def supplier_from_db(doc: dict) -> dict:
+    """DB Ukrainian fields → API fields for Suppliers class."""
+    if doc is None:
+        return None
+    # Support both old seed data field names and new schema
+    name  = doc.get("Ім'я") or doc.get("Імя", "")
+    email = doc.get("Електронна пошта") or doc.get("Електронна_пошта", "")
+    cp    = doc.get("Контактна особа") or doc.get("Контактна_особа", "")
+    return {
+        "_id":            str(doc["_id"]),
+        "name":           name,
+        "edrpou":         doc.get("edrpou", ""),
+        "address":        doc.get("Адреса", ""),
+        "iban":           doc.get("IBAN", ""),
+        "contact_person": cp,
+        "email":          email,
+        "telegram":       doc.get("Телеграма", ""),
+        "phone":          doc.get("Телефон", ""),
+        "contact_info":   email,
+        "bank_details":   doc.get("IBAN", ""),
+    }
+
+# ── МтаК (items) ──────────────────────────────────────────────────────────────
+def item_to_db(data: dict) -> dict:
+    """API fields → DB Ukrainian fields for МтаК class."""
+    return {
+        "ID_м_кл":                     data.get("sku", ""),
+        "ID_Постачальника":            to_oid(data.get("supplier_id")),
+        "ID_хто_видав":                safe_to_oid(data.get("issued_by")),
+        "ID_кому_видає":               data.get("issued_to", ""),   # plain string
+        "ID_хто_списав":               safe_to_oid(data.get("written_off_by")),
+        "назва":                       data.get("name", ""),
+        "категорія":                   data.get("category", ""),
+        "тип":                         data.get("type", ""),
+        "кількість":                   float(data.get("current_stock", 0)),
+        "min_stock":                   float(data.get("min_stock", 0)),
+        "одиниця":                     data.get("unit", "шт"),
+        "ідентифікатор_постачальника": data.get("supplier_sku", ""),
+        "ціна":                        float(data.get("unit_price", 0)),
+        "tax_rate":                    float(data.get("tax_rate", 0.20)),
+        "статус":                      data.get("status", "available"),
+        "дата_отримання":              data.get("received_date"),
+        "термін_придатності":          data.get("expiry_date"),
+        "дата_постачання":             data.get("delivery_date"),
+        "дата_виконання_списання":     data.get("writeoff_date"),
+        "дата_видачі":                 data.get("issued_date"),
+        "received_by":                 data.get("received_by"),
+        "writeoff_reason":             data.get("writeoff_reason"),
+    }
+
+def item_from_db(doc: dict) -> dict:
+    """DB Ukrainian fields → API fields for МтаК class."""
+    if doc is None:
+        return None
+    return {
+        "_id":           str(doc["_id"]),
+        "name":          doc.get("назва", ""),
+        "sku":           doc.get("ID_м_кл", ""),
+        "category":      str(doc.get("категорія", "")),
+        "type":          doc.get("тип", ""),
+        "current_stock": float(doc.get("кількість", 0)),
+        "min_stock":     float(doc.get("min_stock", 0)),
+        "unit":          doc.get("одиниця", "шт"),
+        "unit_price":    float(doc.get("ціна", 0)),
+        "tax_rate":      float(doc.get("tax_rate", 0.20)),
+        "supplier_id":   _oid_str(doc.get("ID_Постачальника")),
+        "issued_by":     _oid_str(doc.get("ID_хто_видав")),
+        "issued_to":     doc.get("ID_кому_видає", ""),
+        "written_off_by": _oid_str(doc.get("ID_хто_списав")),
+        "status":        doc.get("статус", "available"),
+        "received_date": doc.get("дата_отримання"),
+        "expiry_date":   doc.get("термін_придатності"),
+        "delivery_date": doc.get("дата_постачання"),
+        "writeoff_date": doc.get("дата_виконання_списання"),
+        "issued_date":   doc.get("дата_видачі"),
+        "received_by":   doc.get("received_by"),
+        "writeoff_reason": doc.get("writeoff_reason"),
+    }
+
+# ── Persons ───────────────────────────────────────────────────────────────────
+def person_to_db(data: dict) -> dict:
+    """API fields → DB Ukrainian fields for Persons class."""
+    return {
+        "ID_Користувача":   to_oid(data.get("user_id")),
+        "FIO":              data.get("fio", ""),
+        "Електронна пошта": data.get("email", ""),
+        "Опис":             data.get("description", ""),
+        "Дата початку":     data.get("start_date"),
+        "Дата закінчення":  data.get("end_date"),
+        "Робота":           data.get("job", ""),
+    }
+
+def person_from_db(doc: dict) -> dict:
+    """DB Ukrainian fields → API fields for Persons class."""
+    if doc is None:
+        return None
+    uid = doc.get("ID_Користувача")
+    return {
+        "_id":         str(doc["_id"]),
+        "fio":         doc.get("FIO", "") or doc.get("ФІО", ""),
+        "email":       doc.get("Електронна пошта", "") or doc.get("Електронна_пошта", ""),
+        "description": doc.get("Опис", "") or doc.get("Коментарій", ""),
+        "start_date":  doc.get("Дата початку") or doc.get("Дата_початку"),
+        "end_date":    doc.get("Дата закінчення"),
+        "job":         doc.get("Робота", "") or doc.get("Роботи", ""),
+        "user_id":     str(uid) if isinstance(uid, ObjectId) else uid,
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTH DEPENDENCY
+# ═══════════════════════════════════════════════════════════════════════════════
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        role:  str = payload.get("role")
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"email": email, "role": role}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+async def require_manager(current_user: dict = Depends(get_current_user)) -> dict:
+    if current_user["role"] != "manager":
+        raise HTTPException(status_code=403, detail="Manager access required")
+    return current_user
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTH  — User class
+# ═══════════════════════════════════════════════════════════════════════════════
+class UserRegister(BaseModel):
+    firstname: str
+    lastname:  str
+    email:     EmailStr
+    password:  str
+    role:      str   # 'manager' | 'worker'
+
+class UserLogin(BaseModel):
+    email:    EmailStr
+    password: str
+
+@app.post("/auth/register", status_code=201)
+async def register(user: UserRegister):
+    # Логін stores email; check uniqueness
+    if await users_col.find_one({"Логін": user.email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    doc = {
+        "Логін":     user.email,
+        "Пароль":    get_password_hash(user.password),
+        "Роль":      _role_to_ua(user.role),
+        "firstname": user.firstname,
+        "lastname":  user.lastname,
+    }
+    result = await users_col.insert_one(doc)
+    return {"message": "User registered successfully", "id": str(result.inserted_id)}
+
+@app.post("/auth/login")
+async def login(creds: UserLogin):
+    user = await users_col.find_one({"Логін": creds.email})
+    if not user or not verify_password(creds.password, user["Пароль"]):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    role_en = _role_from_ua(user["Роль"])
+    token = create_access_token(data={"sub": user["Логін"], "role": role_en})
+    return {
+        "access_token": token,
+        "token_type":   "bearer",
+        "user": {
+            "email":     user["Логін"],
+            "role":      role_en,
+            "firstname": user.get("firstname", ""),
+            "lastname":  user.get("lastname",  ""),
+        },
+    }
+
+@app.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    user = await users_col.find_one({"Логін": current_user["email"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_from_db(user)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SUPPLIERS  — Suppliers class
+# ═══════════════════════════════════════════════════════════════════════════════
+class SupplierModel(BaseModel):
+    name:           str
+    edrpou:         str = ""
+    address:        str = ""
+    iban:           str = ""
+    contact_person: str = ""
+    email:          str = ""
+    telegram:       str = ""
+    phone:          str = ""
+
+@app.get("/suppliers")
+async def list_suppliers(_: dict = Depends(get_current_user)):
+    docs = await suppliers_col.find().to_list(length=None)
+    return [supplier_from_db(d) for d in docs]
+
+@app.get("/suppliers/{sid}")
+async def get_supplier(sid: str, _: dict = Depends(get_current_user)):
+    doc = await suppliers_col.find_one({"_id": to_oid(sid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    return supplier_from_db(doc)
+
+@app.post("/suppliers", status_code=201)
+async def create_supplier(body: SupplierModel, _: dict = Depends(require_manager)):
+    doc = supplier_to_db(body.model_dump())
+    result = await suppliers_col.insert_one(doc)
+    return supplier_from_db(await suppliers_col.find_one({"_id": result.inserted_id}))
+
+@app.put("/suppliers/{sid}")
+async def update_supplier(sid: str, body: SupplierModel, _: dict = Depends(require_manager)):
+    doc = supplier_to_db(body.model_dump())
+    result = await suppliers_col.update_one({"_id": to_oid(sid)}, {"$set": doc})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    return supplier_from_db(await suppliers_col.find_one({"_id": to_oid(sid)}))
+
+@app.delete("/suppliers/{sid}")
+async def delete_supplier(sid: str, _: dict = Depends(require_manager)):
+    result = await suppliers_col.delete_one({"_id": to_oid(sid)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    return {"message": "Supplier deleted"}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ITEMS (МтаК)  — МтаК class
+# ═══════════════════════════════════════════════════════════════════════════════
+class ItemModel(BaseModel):
+    model_config = {"extra": "allow"}
+
+    name:           str
+    sku:            str           = ""
+    category:       str           = ""
+    type:           str           = ""
+    current_stock:  float         = 0
+    min_stock:      float         = 0
+    unit:           str           = "шт"
+    unit_price:     float         = 0
+    tax_rate:       float         = 0.20
+    supplier_id:    Optional[str] = None
+    status:         str           = "available"
+    received_date:  Optional[str] = None
+    received_by:    Optional[str] = None
+    expiry_date:    Optional[str] = None
+    delivery_date:  Optional[str] = None
+    issued_date:    Optional[str] = None
+    writeoff_date:  Optional[str] = None
+    issued_by:      Optional[str] = None
+    issued_to:      Optional[str] = None
+    written_off_by: Optional[str] = None
+    writeoff_reason: Optional[str] = None
+    supplier_sku:   Optional[str] = None
+
+@app.get("/items")
+async def list_items(
+    status:   Optional[str] = None,
+    category: Optional[str] = None,
+    _: dict = Depends(get_current_user),
+):
+    query: dict = {}
+    if status:
+        query["статус"] = status       # map English param → Ukrainian DB field
+    if category:
+        query["категорія"] = category
+    docs = await items_col.find(query).to_list(length=None)
+    return [item_from_db(d) for d in docs]
+
+@app.get("/items/{iid}")
+async def get_item(iid: str, _: dict = Depends(get_current_user)):
+    doc = await items_col.find_one({"_id": to_oid(iid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item_from_db(doc)
+
+@app.post("/items", status_code=201)
+async def create_item(body: ItemModel, _: dict = Depends(get_current_user)):
+    doc = item_to_db(body.model_dump())
+    result = await items_col.insert_one(doc)
+    return item_from_db(await items_col.find_one({"_id": result.inserted_id}))
+
+@app.put("/items/{iid}")
+async def update_item(iid: str, body: ItemModel, _: dict = Depends(get_current_user)):
+    doc = item_to_db(body.model_dump())
+    result = await items_col.update_one({"_id": to_oid(iid)}, {"$set": doc})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item_from_db(await items_col.find_one({"_id": to_oid(iid)}))
+
+@app.delete("/items/{iid}")
+async def delete_item(iid: str, _: dict = Depends(require_manager)):
+    result = await items_col.delete_one({"_id": to_oid(iid)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"message": "Item deleted"}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PERSONS  — Persons class
+# ═══════════════════════════════════════════════════════════════════════════════
+class PersonModel(BaseModel):
+    fio:         str
+    email:       str           = ""
+    description: str           = ""
+    start_date:  Optional[str] = None
+    end_date:    Optional[str] = None
+    job:         str           = ""
+    user_id:     Optional[str] = None
+
+@app.get("/persons")
+async def list_persons(_: dict = Depends(get_current_user)):
+    docs = await persons_col.find().to_list(length=None)
+    return [person_from_db(d) for d in docs]
+
+@app.get("/persons/{pid}")
+async def get_person(pid: str, _: dict = Depends(get_current_user)):
+    doc = await persons_col.find_one({"_id": to_oid(pid)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return person_from_db(doc)
+
+@app.post("/persons", status_code=201)
+async def create_person(body: PersonModel, _: dict = Depends(require_manager)):
+    doc = person_to_db(body.model_dump())
+    result = await persons_col.insert_one(doc)
+    return person_from_db(await persons_col.find_one({"_id": result.inserted_id}))
+
+@app.put("/persons/{pid}")
+async def update_person(pid: str, body: PersonModel, _: dict = Depends(require_manager)):
+    doc = person_to_db(body.model_dump())
+    result = await persons_col.update_one({"_id": to_oid(pid)}, {"$set": doc})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return person_from_db(await persons_col.find_one({"_id": to_oid(pid)}))
+
+@app.delete("/persons/{pid}")
+async def delete_person(pid: str, _: dict = Depends(require_manager)):
+    result = await persons_col.delete_one({"_id": to_oid(pid)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return {"message": "Person deleted"}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TRANSACTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+class TransactionModel(BaseModel):
+    model_config = {"extra": "allow"}
+
+    type:            str
+    product_id:      Optional[str] = None
+    item_id:         Optional[str] = None
+    quantity:        float          = 0
+    user_id:         Optional[str] = None
+    document_id:     Optional[str] = None
+    ref_document_id: Optional[str] = None
+    date:            Optional[str] = None
+    notes:           Optional[str] = None
+    returned_from:   Optional[str] = None
+
+@app.get("/transactions")
+async def list_transactions(
+    type: Optional[str] = None,
+    _: dict = Depends(get_current_user),
+):
+    query: dict = {}
+    if type:
+        query["type"] = type
+    docs = await transactions_col.find(query).sort("date", -1).to_list(length=None)
+    return [serialize(d) for d in docs]
+
+@app.post("/transactions", status_code=201)
+async def create_transaction(body: TransactionModel, _: dict = Depends(get_current_user)):
+    doc = body.model_dump()
+    raw_item_id = doc.pop("product_id", None) or doc.pop("item_id", None)
+    doc["item_id"]     = to_oid(raw_item_id) if raw_item_id else None
+    doc["user_id"]     = safe_to_oid(doc.get("user_id"))
+    doc["document_id"] = safe_to_oid(doc.get("document_id"))
+    doc.pop("ref_document_id", None)
+    doc["date"] = doc.get("date") or datetime.utcnow().isoformat()
+    result = await transactions_col.insert_one(doc)
+    return serialize(await transactions_col.find_one({"_id": result.inserted_id}))
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOCUMENTS
+# ═══════════════════════════════════════════════════════════════════════════════
+class DocumentModel(BaseModel):
+    model_config = {"extra": "allow"}
+
+    type:          str
+    status:        str            = "pending"
+    created_by:    Optional[str] = None
+    created_at:    Optional[str] = None
+    items:         List[Any]     = []
+    total_sum:     Optional[float] = None
+    total_vat:     Optional[float] = None
+    item_id:       Optional[str] = None
+    quantity:      Optional[float] = None
+    recipient:     Optional[str] = None
+    reason:        Optional[str] = None
+    notes:         Optional[str] = None
+    discrepancies: List[Any]     = []
+
+@app.get("/documents")
+async def list_documents(
+    status: Optional[str] = None,
+    type:   Optional[str] = None,
+    _: dict = Depends(get_current_user),
+):
+    query: dict = {}
+    if status:
+        query["status"] = status
+    if type:
+        query["type"] = type
+    docs = await documents_col.find(query).sort("created_at", -1).to_list(length=None)
+    return [serialize(d) for d in docs]
+
+@app.get("/documents/{did}")
+async def get_document(did: str, _: dict = Depends(get_current_user)):
+    doc = await documents_col.find_one({"_id": to_oid(did)})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return serialize(doc)
+
+@app.post("/documents", status_code=201)
+async def create_document(body: DocumentModel, _: dict = Depends(get_current_user)):
+    doc = body.model_dump()
+    doc["created_at"] = doc.get("created_at") or datetime.utcnow().isoformat()
+    doc["created_by"] = safe_to_oid(doc.get("created_by"))
+    result = await documents_col.insert_one(doc)
+    return serialize(await documents_col.find_one({"_id": result.inserted_id}))
+
+@app.put("/documents/{did}")
+async def update_document(did: str, body: DocumentModel, _: dict = Depends(require_manager)):
+    doc = body.model_dump()
+    doc["created_by"] = safe_to_oid(doc.get("created_by"))
+    result = await documents_col.update_one({"_id": to_oid(did)}, {"$set": doc})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return serialize(await documents_col.find_one({"_id": to_oid(did)}))
+
+@app.patch("/documents/{did}/approve")
+async def approve_document(did: str, _: dict = Depends(require_manager)):
+    result = await documents_col.update_one(
+        {"_id": to_oid(did)},
+        {"$set": {"status": "approved"}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return serialize(await documents_col.find_one({"_id": to_oid(did)}))
+
+@app.patch("/documents/{did}/reject")
+async def reject_document(did: str, _: dict = Depends(require_manager)):
+    result = await documents_col.update_one(
+        {"_id": to_oid(did)},
+        {"$set": {"status": "rejected"}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return serialize(await documents_col.find_one({"_id": to_oid(did)}))
+
+@app.delete("/documents/{did}")
+async def delete_document(did: str, _: dict = Depends(require_manager)):
+    result = await documents_col.delete_one({"_id": to_oid(did)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"message": "Document deleted"}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STATS
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.get("/stats")
+async def get_stats(_: dict = Depends(get_current_user)):
+    total_items     = await items_col.count_documents({})
+    available       = await items_col.count_documents({"статус": "available"})
+    issued          = await items_col.count_documents({"статус": "issued"})
+    written_off     = await items_col.count_documents({"статус": "written_off"})
+    damaged         = await items_col.count_documents({"статус": "damaged"})
+    total_suppliers = await suppliers_col.count_documents({})
+    pending_docs    = await documents_col.count_documents({"status": "pending"})
+
+    pipeline = [
+        {"$match": {"статус": "available"}},
+        {"$group": {"_id": None,
+                    "total": {"$sum": {"$multiply": ["$кількість", "$ціна"]}}}},
+    ]
+    agg = await items_col.aggregate(pipeline).to_list(length=1)
+    stock_value = agg[0]["total"] if agg else 0
+
+    return {
+        "total_items":       total_items,
+        "available":         available,
+        "issued":            issued,
+        "written_off":       written_off,
+        "damaged":           damaged,
+        "total_suppliers":   total_suppliers,
+        "pending_approvals": pending_docs,
+        "total_stock_value": round(stock_value, 2),
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROCUREMENT ORDERS
+# ═══════════════════════════════════════════════════════════════════════════════
+class ProcurementModel(BaseModel):
+    item_id:       Optional[str] = None
+    supplier_id:   Optional[str] = None
+    item_name:     str           = ""
+    supplier_name: str           = ""
+    quantity:      float         = 1
+    unit_price:    float         = 0
+    total:         float         = 0
+    status:        str           = "planned"   # planned | ordered | received
+    date:          Optional[str] = None
+    created_by:    Optional[str] = None
+
+def procurement_from_db(doc: dict) -> dict:
+    if doc is None:
+        return None
+    return {
+        "_id":           str(doc["_id"]),
+        "item_id":       _oid_str(doc.get("item_id")),
+        "supplier_id":   _oid_str(doc.get("supplier_id")),
+        "item_name":     doc.get("item_name", ""),
+        "supplier_name": doc.get("supplier_name", ""),
+        "quantity":      float(doc.get("quantity", 1)),
+        "unit_price":    float(doc.get("unit_price", 0)),
+        "total":         float(doc.get("total", 0)),
+        "status":        doc.get("status", "planned"),
+        "date":          doc.get("date"),
+        "created_by":    _oid_str(doc.get("created_by")),
+    }
+
+@app.get("/procurement")
+async def list_procurement(_: dict = Depends(get_current_user)):
+    docs = await procurement_col.find().sort("date", -1).to_list(length=None)
+    return [procurement_from_db(d) for d in docs]
+
+@app.post("/procurement", status_code=201)
+async def create_procurement(body: ProcurementModel, current_user: dict = Depends(require_manager)):
+    doc = body.model_dump()
+    doc["item_id"]    = to_oid(doc.get("item_id"))
+    doc["supplier_id"] = to_oid(doc.get("supplier_id"))
+    doc["created_by"] = None
+    user = await users_col.find_one({"Логін": current_user["email"]})
+    if user:
+        doc["created_by"] = user["_id"]
+    doc["date"] = doc.get("date") or datetime.utcnow().isoformat()
+    result = await procurement_col.insert_one(doc)
+    return procurement_from_db(await procurement_col.find_one({"_id": result.inserted_id}))
+
+@app.patch("/procurement/{pid}/status")
+async def update_procurement_status(pid: str, status: str, _: dict = Depends(require_manager)):
+    allowed = {"planned", "ordered", "received"}
+    if status not in allowed:
+        raise HTTPException(status_code=400, detail=f"Status must be one of: {allowed}")
+    result = await procurement_col.update_one(
+        {"_id": to_oid(pid)},
+        {"$set": {"status": status}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return procurement_from_db(await procurement_col.find_one({"_id": to_oid(pid)}))
+
+@app.delete("/procurement/{pid}")
+async def delete_procurement(pid: str, _: dict = Depends(require_manager)):
+    result = await procurement_col.delete_one({"_id": to_oid(pid)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"message": "Order deleted"}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DETAIL REQUESTS  (read from DiplomDB, update status only)
+# ═══════════════════════════════════════════════════════════════════════════════
+def detail_request_from_db(doc: dict) -> dict:
+    if doc is None:
+        return None
+    return {
+        "_id":           str(doc["_id"]),
+        "order_id":      str(doc["order_id"])      if doc.get("order_id")      else None,
+        "specialist_id": str(doc["specialist_id"]) if doc.get("specialist_id") else None,
+        "detail_needs":  doc.get("detail_needs", ""),
+        "explanation":   doc.get("explanation", ""),
+        "photos":        doc.get("photos", []),
+        "status":        doc.get("status", "CREATED"),
+        "approved_by":   doc.get("approved_by"),
+        "approved_at":   doc.get("approved_at"),
+        "created_at":    doc.get("created_at").isoformat() if hasattr(doc.get("created_at"), "isoformat") else str(doc.get("created_at", "")),
+    }
+
+class DetailRequestStatusUpdate(BaseModel):
+    approved_by: str   # full name of the worker
+
+@app.get("/detail-requests")
+async def list_detail_requests(_: dict = Depends(get_current_user)):
+    docs = await detail_requests_col.find().sort("created_at", -1).to_list(length=None)
+    return [detail_request_from_db(d) for d in docs]
+
+@app.patch("/detail-requests/{rid}/approve")
+async def approve_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
+    result = await detail_requests_col.update_one(
+        {"_id": to_oid(rid)},
+        {"$set": {
+            "status":      "APPROVED",
+            "approved_by": body.approved_by,
+            "approved_at": datetime.utcnow().isoformat(),
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    doc = await detail_requests_col.find_one({"_id": to_oid(rid)})
+    return detail_request_from_db(doc)
+
+@app.patch("/detail-requests/{rid}/reject")
+async def reject_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
+    result = await detail_requests_col.update_one(
+        {"_id": to_oid(rid)},
+        {"$set": {
+            "status":      "REJECTED",
+            "approved_by": body.approved_by,
+            "approved_at": datetime.utcnow().isoformat(),
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    doc = await detail_requests_col.find_one({"_id": to_oid(rid)})
+    return detail_request_from_db(doc)
