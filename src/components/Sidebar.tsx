@@ -16,6 +16,7 @@ import {
     Undo2,
     BrainCircuit,
     Wrench,
+    UserCog,
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -35,12 +36,13 @@ const Sidebar = () => {
         { name: t('sidebar.documents'), path: '/manager/documents', icon: <FileText size={20} /> },
         { name: t('sidebar.approvals'), path: '/manager/approvals', icon: <CheckSquare size={20} /> },
         { name: t('sidebar.analytics'), path: '/manager/analytics', icon: <BrainCircuit size={20} /> },
+        { name: t('sidebar.users'),     path: '/manager/users',     icon: <UserCog size={20} /> },
     ];
 
     const workerLinks = [
         { name: t('sidebar.stockOverview'), path: '/worker', icon: <PackageSearch size={20} />, exact: true },
         { name: t('sidebar.receiving'), path: '/worker/receiving', icon: <ArrowDownToLine size={20} /> },
-        { name: 'Видача та запити', path: '/worker/issuing', icon: <ArrowUpFromLine size={20} /> },
+        { name: t('sidebar.issuing'), path: '/worker/issuing', icon: <ArrowUpFromLine size={20} /> },
         { name: t('sidebar.inventoryCheck'), path: '/worker/inventory-check', icon: <ClipboardCheck size={20} /> },
         { name: t('sidebar.writeOffs'), path: '/worker/write-offs', icon: <Ban size={20} /> },
         { name: t('sidebar.returns'), path: '/worker/returns', icon: <Undo2 size={20} /> },
@@ -55,7 +57,7 @@ const Sidebar = () => {
                 <div className="w-8 h-8 rounded bg-white/20 flex items-center justify-center">
                     <PackageSearch size={20} className="text-white" />
                 </div>
-                <h2 className="text-xl font-bold tracking-tight">Облік запасних частин</h2>
+                <h2 className="text-xl font-bold tracking-tight">{t('sidebar.appTitle')}</h2>
             </div>
 
             <div className="p-4 border-b border-white/10">

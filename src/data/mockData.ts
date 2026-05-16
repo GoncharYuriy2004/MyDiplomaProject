@@ -1,9 +1,10 @@
 export type User = {
     _id: string;
-    username: string;
-    password_hash: string;
-    role: "manager" | "worker";
+    login: string;
     full_name: string;
+    role: "manager" | "worker";          // frontend shorthand
+    role_in_system: string;              // WAREHOUSE_MANAGER | WAREHOUSE_WORKER
+    account_status: string;
 };
 
 export type Supplier = {

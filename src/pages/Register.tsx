@@ -13,17 +13,24 @@ const Register = () => {
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
-        firstname: '',
-        lastname: '',
+        full_name: '',
+        pass_number: '',
+        login: '',
         email: '',
         password: '',
         confirmPassword: '',
-        role: 'worker'
+        role_in_system: 'WAREHOUSE_WORKER',
+        position: '',
+        phone: '',
+        workshop: '',
+        floor: '',
+        office: '',
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [registered, setRegistered] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -41,14 +48,20 @@ const Register = () => {
         setIsLoading(true);
         try {
             const result = await register({
-                firstname: formData.firstname,
-                lastname: formData.lastname,
-                email: formData.email,
-                password: formData.password,
-                role: formData.role,
+                full_name:       formData.full_name,
+                pass_number:     parseInt(formData.pass_number) || 0,
+                login:           formData.login,
+                password:        formData.password,
+                role_in_system:  formData.role_in_system,
+                email:           formData.email,
+                position:        formData.position,
+                phone:           formData.phone,
+                workshop_number: parseInt(formData.workshop) || 0,
+                floor_number:    parseInt(formData.floor) || 0,
+                office_number:   parseInt(formData.office) || 0,
             });
             if (result.success) {
-                navigate('/login');
+                setRegistered(true);
             } else {
                 setError(result.error ?? t('register.error.general'));
             }
@@ -110,6 +123,22 @@ const Register = () => {
                 <div className="bg-white text-slate-900 p-10 md:p-12 rounded-[3.5rem] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-[500px] border border-white relative overflow-hidden transform animate-fade-in" style={{ animationDelay: '0.2s' }}>
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
                     
+                    {registered ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center animate-fade-in">
+                            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-6 shadow-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-800 mb-3">{t('register.success.title')}</h2>
+                            <p className="text-slate-500 font-medium mb-8 leading-relaxed">{t('register.success.message')}</p>
+                            <Link
+                                to="/login"
+                                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-blue-600/30"
+                            >
+                                {t('register.signIn')}
+                            </Link>
+                        </div>
+                    ) : (
+                    <>
                     <div className="flex items-center gap-4 mb-4 relative z-10">
                         <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
                             <div className="w-3 h-3 rounded-full bg-white opacity-80" />
@@ -130,94 +159,170 @@ const Register = () => {
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="flex gap-4">
-                            <div className="flex-1">
+                        <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.fullName')}</label>
                                 <input
                                     type="text"
-                                    name="firstname"
-                                    placeholder={t('register.field.firstname')}
-                                    value={formData.firstname}
+                                    name="full_name"
+                                    placeholder={t('register.field.fullName')}
+                                    value={formData.full_name}
                                     onChange={handleChange}
-                                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-lg hover:bg-white"
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
                                     required
                                 />
                             </div>
-                            <div className="flex-1">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.login')}</label>
                                 <input
                                     type="text"
-                                    name="lastname"
-                                    placeholder={t('register.field.lastname')}
-                                    value={formData.lastname}
+                                    name="login"
+                                    placeholder={t('register.field.login')}
+                                    value={formData.login}
                                     onChange={handleChange}
-                                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-lg hover:bg-white"
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
                                     required
                                 />
                             </div>
                         </div>
 
-                        <div>
+                        <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.password')}</label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        placeholder={t('register.field.password')}
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white pr-12"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.confirmPassword')}</label>
+                                <div className="relative">
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        name="confirmPassword"
+                                        placeholder={t('register.field.confirmPassword')}
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white pr-12"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.position')}</label>
+                                <div className="relative">
+                                    <select
+                                        name="role_in_system"
+                                        value={formData.role_in_system}
+                                        onChange={handleChange}
+                                        className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-slate-800 font-semibold text-[15px] appearance-none cursor-pointer hover:bg-white"
+                                        required
+                                    >
+                                        <option value="WAREHOUSE_WORKER">{t('role.warehouse_worker')}</option>
+                                        <option value="WAREHOUSE_MANAGER">{t('role.warehouse_manager')}</option>
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.phone')}</label>
+                                <input
+                                    type="text"
+                                    name="phone"
+                                    placeholder={t('register.placeholder.phone')}
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5 w-full">
+                            <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.email')}</label>
                             <input
                                 type="email"
                                 name="email"
                                 placeholder={t('register.field.email')}
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-lg hover:bg-white"
-                                required
+                                className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
                             />
                         </div>
 
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                placeholder={t('register.field.password')}
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-lg hover:bg-white pr-12"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
-                            </button>
+                        <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.passNumber')}</label>
+                                <input
+                                    type="number"
+                                    name="pass_number"
+                                    placeholder="123456"
+                                    value={formData.pass_number}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                    required
+                                />
+                            </div>
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.workshop')}</label>
+                                <input
+                                    type="text"
+                                    name="workshop"
+                                    placeholder={t('register.placeholder.workshop')}
+                                    value={formData.workshop}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                />
+                            </div>
                         </div>
 
-                        <div className="relative">
-                            <input
-                                type={showConfirmPassword ? "text" : "password"}
-                                name="confirmPassword"
-                                placeholder={t('register.field.confirmPassword')}
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-lg hover:bg-white pr-12"
-                                required
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
-                            >
-                                {showConfirmPassword ? <EyeOff size={22} /> : <Eye size={22} />}
-                            </button>
-                        </div>
-
-                        <div className="relative">
-                            <select
-                                name="role"
-                                value={formData.role}
-                                onChange={handleChange}
-                                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-slate-800 font-bold text-lg appearance-none cursor-pointer hover:bg-white"
-                                required
-                            >
-                                <option value="worker">{t('role.warehouse_worker')}</option>
-                                <option value="manager">{t('role.warehouse_manager')}</option>
-                            </select>
-                            <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.floor')}</label>
+                                <input
+                                    type="text"
+                                    name="floor"
+                                    placeholder={t('register.placeholder.floor')}
+                                    value={formData.floor}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                />
+                            </div>
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.office')}</label>
+                                <input
+                                    type="text"
+                                    name="office"
+                                    placeholder={t('register.placeholder.office')}
+                                    value={formData.office}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                />
                             </div>
                         </div>
 
@@ -248,6 +353,8 @@ const Register = () => {
                             </Link>
                         </p>
                     </div>
+                    </>
+                    )}
                 </div>
             </div>
         </div>

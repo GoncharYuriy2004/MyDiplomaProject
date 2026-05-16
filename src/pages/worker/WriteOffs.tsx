@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useItems } from '../../context/ItemsContext';
 import { apiCreateTransaction, apiCreateDocument, apiGetDocuments } from '../../utils/api';
 import { downloadWriteoffActPDF } from '../../utils/pdfGenerator';
+import { translateItemName, translateUnit } from '../../utils/translateItem';
 
 type WriteOffDoc = {
     id: string;
@@ -19,7 +20,7 @@ type WriteOffDoc = {
 };
 
 const WriteOffs = () => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { user } = useAuth();
     const { items, updateItem, refetch } = useItems();
 
@@ -164,7 +165,7 @@ const WriteOffs = () => {
                                 <option value="" disabled>{t('writeoffs.placeholder.item')}</option>
                                 {items.map(p => (
                                     <option key={p._id} value={p._id} disabled={p.current_stock === 0}>
-                                        {p.name} (SKU: {p.sku}) — {p.current_stock} {t('procurement.msg.inStock')}
+                                        {translateItemName(p.name, language)} (SKU: {p.sku}) — {p.current_stock} {translateUnit(p.unit, language)}
                                     </option>
                                 ))}
                             </select>

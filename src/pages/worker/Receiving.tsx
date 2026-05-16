@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
-import { PackagePlus, Search, Link, PlusCircle, Box, CheckCircle2 } from 'lucide-react';
+import { PackagePlus, Search, Link, PlusCircle, Box, CheckCircle2, XCircle } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useItems } from '../../context/ItemsContext';
 import { apiCreateTransaction } from '../../utils/api';
+import { translateItemName, translateUnit } from '../../utils/translateItem';
 
 const Receiving = () => {
     const [receiveMode, setReceiveMode] = useState<'existing' | 'new'>('existing');
 
+    // Existing item search
     const [selectedProduct, setSelectedProduct] = useState('');
+    const [itemSearch, setItemSearch]           = useState('');
+    const [itemDropOpen, setItemDropOpen]       = useState(false);
 
     const [newProductName, setNewProductName] = useState('');
-    const [newProductSku, setNewProductSku] = useState('');
+    const [newProductSku, setNewProductSku]   = useState('');
     const [newProductCategory, setNewProductCategory] = useState('');
-    const [newProductUnit, setNewProductUnit] = useState('шт');
+    const [categorySearch, setCategorySearch]         = useState('');
+    const [categoryDropOpen, setCategoryDropOpen]     = useState(false);
+    const [newProductUnit, setNewProductUnit]   = useState('шт');
     const [newProductPrice, setNewProductPrice] = useState('');
     const [newProductExpiryDate, setNewProductExpiryDate] = useState('');
 
@@ -24,8 +30,48 @@ const Receiving = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const { user } = useAuth();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { items, updateItem, createItem, refetch } = useItems();
+
+    // ── Category list ─────────────────────────────────────────────────────────
+    const ALL_CATEGORIES = [
+        { value: 'cpu',         label: t('receiving.category.cpu') },
+        { value: 'motherboard', label: t('receiving.category.motherboard') },
+        { value: 'gpu',         label: t('receiving.category.gpu') },
+        { value: 'ram',         label: t('receiving.category.ram') },
+        { value: 'storage',     label: t('receiving.category.storage') },
+        { value: 'psu',         label: t('receiving.category.psu') },
+        { value: 'case',        label: t('receiving.category.case') },
+        { value: 'cooling',     label: t('receiving.category.cooling') },
+        { value: 'peripherals', label: t('receiving.category.peripherals') },
+        { value: 'cables',      label: t('receiving.category.cables') },
+        { value: 'consumables', label: t('receiving.category.consumables') },
+        { value: 'other',       label: t('receiving.category.other') },
+    ];
+
+    const filteredCategories = ALL_CATEGORIES.filter(c =>
+        !categorySearch || c.label.toLowerCase().includes(categorySearch.toLowerCase())
+    );
+
+    const selectCategory = (value: string, label: string) => {
+        setNewProductCategory(value);
+        setCategorySearch(label);
+        setCategoryDropOpen(false);
+    };
+
+    // ── Item search ───────────────────────────────────────────────────────────
+    const filteredItems = items.filter(it =>
+        !itemSearch ||
+        it.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+        it.sku.toLowerCase().includes(itemSearch.toLowerCase())
+    );
+
+    const selectItem = (id: string) => {
+        const it = items.find(i => i._id === id);
+        setSelectedProduct(id);
+        setItemSearch(it ? `${translateItemName(it.name, language)} (${it.sku})` : '');
+        setItemDropOpen(false);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -78,10 +124,10 @@ const Receiving = () => {
             setSuccessMessage(msg);
             setTimeout(() => setSuccessMessage(''), 5000);
 
-            setSelectedProduct('');
+            setSelectedProduct(''); setItemSearch(''); setItemDropOpen(false);
             setNewProductName('');
             setNewProductSku('');
-            setNewProductCategory('');
+            setNewProductCategory(''); setCategorySearch(''); setCategoryDropOpen(false);
             setNewProductUnit('шт');
             setNewProductPrice('');
             setNewProductExpiryDate('');
@@ -148,20 +194,44 @@ const Receiving = () => {
                         <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100 mb-6">
                             <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('receiving.field.existingItem')}</label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                    <Search className="h-4 w-4 text-slate-400" />
-                                </div>
-                                <select
-                                    required
-                                    value={selectedProduct}
-                                    onChange={(e) => setSelectedProduct(e.target.value)}
-                                    className="block w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all shadow-sm"
-                                >
-                                    <option value="" disabled>{t('receiving.placeholder.search')}</option>
-                                    {items.map(p => (
-                                        <option key={p._id} value={p._id}>{p.name} (SKU: {p.sku})</option>
-                                    ))}
-                                </select>
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={itemSearch}
+                                    onChange={e => { setItemSearch(e.target.value); setSelectedProduct(''); setItemDropOpen(true); }}
+                                    onFocus={() => setItemDropOpen(true)}
+                                    onBlur={() => setTimeout(() => setItemDropOpen(false), 150)}
+                                    placeholder={t('receiving.placeholder.search')}
+                                    className="block w-full pl-10 pr-9 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all shadow-sm"
+                                />
+                                {selectedProduct && (
+                                    <button type="button" onMouseDown={() => { setSelectedProduct(''); setItemSearch(''); setItemDropOpen(true); }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <XCircle size={15} />
+                                    </button>
+                                )}
+                                {/* hidden required input for form validation */}
+                                <input type="text" required value={selectedProduct} onChange={() => {}} className="sr-only" tabIndex={-1} />
+
+                                {itemDropOpen && (
+                                    <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                                        {filteredItems.length === 0 ? (
+                                            <p className="text-xs text-slate-400 text-center py-4">{t('dashboard.noResults')}</p>
+                                        ) : filteredItems.map(it => (
+                                            <button key={it._id} type="button"
+                                                onMouseDown={() => selectItem(it._id)}
+                                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-green-50 transition-colors flex items-center justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-slate-800 truncate">{translateItemName(it.name, language)}</p>
+                                                    <p className="text-[11px] text-slate-400 font-mono">{it.sku}</p>
+                                                </div>
+                                                <span className={`text-[11px] font-bold shrink-0 px-1.5 py-0.5 rounded ${it.current_stock > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                                                    {it.current_stock} {translateUnit(it.unit, language)}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ) : (
@@ -189,28 +259,35 @@ const Receiving = () => {
                                         placeholder={t('receiving.placeholder.sku')}
                                     />
                                 </div>
-                                <div>
+                                <div className="relative">
                                     <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('receiving.field.category')}</label>
-                                    <select
-                                        required
-                                        value={newProductCategory}
-                                        onChange={(e) => setNewProductCategory(e.target.value)}
-                                        className="block w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
-                                    >
-                                        <option value="" disabled>{t('receiving.placeholder.category')}</option>
-                                        <option value="cpu">{t('receiving.category.cpu')}</option>
-                                        <option value="motherboard">{t('receiving.category.motherboard')}</option>
-                                        <option value="gpu">{t('receiving.category.gpu')}</option>
-                                        <option value="ram">{t('receiving.category.ram')}</option>
-                                        <option value="storage">{t('receiving.category.storage')}</option>
-                                        <option value="psu">{t('receiving.category.psu')}</option>
-                                        <option value="case">{t('receiving.category.case')}</option>
-                                        <option value="cooling">{t('receiving.category.cooling')}</option>
-                                        <option value="peripherals">{t('receiving.category.peripherals')}</option>
-                                        <option value="cables">{t('receiving.category.cables')}</option>
-                                        <option value="consumables">{t('receiving.category.consumables')}</option>
-                                        <option value="other">{t('receiving.category.other')}</option>
-                                    </select>
+                                    <div className="relative">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                                        <input
+                                            type="text"
+                                            value={categorySearch}
+                                            onChange={e => { setCategorySearch(e.target.value); setNewProductCategory(''); setCategoryDropOpen(true); }}
+                                            onFocus={() => setCategoryDropOpen(true)}
+                                            onBlur={() => setTimeout(() => setCategoryDropOpen(false), 150)}
+                                            placeholder={t('receiving.placeholder.category')}
+                                            className="block w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                        />
+                                        {/* hidden required input */}
+                                        <input type="text" required value={newProductCategory} onChange={() => {}} className="sr-only" tabIndex={-1} />
+                                    </div>
+                                    {categoryDropOpen && (
+                                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                            {filteredCategories.length === 0 ? (
+                                                <p className="text-xs text-slate-400 text-center py-3">Нічого не знайдено</p>
+                                            ) : filteredCategories.map(c => (
+                                                <button key={c.value} type="button"
+                                                    onMouseDown={() => selectCategory(c.value, c.label)}
+                                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition-colors ${newProductCategory === c.value ? 'bg-blue-50 font-semibold text-blue-700' : 'text-slate-700'}`}>
+                                                    {c.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

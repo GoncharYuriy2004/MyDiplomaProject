@@ -16,6 +16,7 @@ from auth_utils import (
     ALGORITHM,
 )
 import motor.motor_asyncio
+import httpx
 import os
 
 load_dotenv()
@@ -37,7 +38,6 @@ DB_NAME   = os.getenv("DB_NAME", "user_Diplom")
 client    = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)
 db        = client[DB_NAME]
 
-users_col        = db["users"]
 persons_col      = db["persons"]
 suppliers_col    = db["suppliers"]
 items_col        = db["mtak"]          # МтаК — матеріально-технічні цінності
@@ -45,23 +45,20 @@ transactions_col = db["transactions"]
 documents_col    = db["documents"]
 procurement_col  = db["procurement_orders"]
 
-# ── External DB (DiplomDB — read requests, update status only) ────────────────
+# ── Shared DB (DiplomDB — users shared with C# server) ───────────────────────
 diplom_db           = client["DiplomDB"]
+users_col           = diplom_db["users"]
 detail_requests_col = diplom_db["detail_requests"]
+
+# ── C# server base URL ────────────────────────────────────────────────────────
+CS_API = os.getenv("CS_API_URL", "http://87.244.166.92:666")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ROLE MAPPING  (API English ↔ DB Ukrainian)
+# ROLE HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
-_ROLE_TO_UA   = {"manager": "Менеджер", "worker": "Працівник", "admin": "Адміністратор"}
-_ROLE_FROM_UA = {"менеджер": "manager", "працівник": "worker", "адміністратор": "manager"}
-
-def _role_to_ua(role: str) -> str:
-    return _ROLE_TO_UA.get((role or "").lower(), role)
-
-def _role_from_ua(role: str) -> str:
-    return _ROLE_FROM_UA.get((role or "").lower(), role)
+_VALID_ROLES = {"WAREHOUSE_MANAGER", "WAREHOUSE_WORKER"}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -104,15 +101,21 @@ def serialize(doc: dict) -> dict:
 
 # ── User ──────────────────────────────────────────────────────────────────────
 def user_from_db(doc: dict) -> dict:
-    """DB fields → API fields for User class."""
+    """DB fields → API fields for User."""
     if doc is None:
         return None
     return {
-        "_id":       str(doc["_id"]),
-        "email":     doc.get("Логін", ""),
-        "role":      _role_from_ua(doc.get("Роль", "")),
-        "firstname": doc.get("firstname", ""),
-        "lastname":  doc.get("lastname",  ""),
+        "_id":            str(doc["_id"]),
+        "login":          doc.get("login", ""),
+        "full_name":      doc.get("full_name", ""),
+        "role_in_system": doc.get("role_in_system", ""),
+        "account_status": doc.get("account_status", ""),
+        "pass_number":    doc.get("pass_number", 0),
+        "position":       doc.get("position", ""),
+        "phone":          doc.get("phone", ""),
+        "email":          doc.get("email", ""),
+        "last_login":     doc.get("last_login").isoformat() if doc.get("last_login") else None,
+        "created_at":     doc.get("created_at").isoformat() if doc.get("created_at") else None,
     }
 
 # ── Suppliers ─────────────────────────────────────────────────────────────────
@@ -243,16 +246,16 @@ def person_from_db(doc: dict) -> dict:
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        login: str = payload.get("sub")
         role:  str = payload.get("role")
-        if not email:
+        if not login:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return {"email": email, "role": role}
+        return {"login": login, "role": role}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 async def require_manager(current_user: dict = Depends(get_current_user)) -> dict:
-    if current_user["role"] != "manager":
+    if current_user["role"] != "WAREHOUSE_MANAGER":
         raise HTTPException(status_code=403, detail="Manager access required")
     return current_user
 
@@ -260,55 +263,155 @@ async def require_manager(current_user: dict = Depends(get_current_user)) -> dic
 # AUTH  — User class
 # ═══════════════════════════════════════════════════════════════════════════════
 class UserRegister(BaseModel):
-    firstname: str
-    lastname:  str
-    email:     EmailStr
-    password:  str
-    role:      str   # 'manager' | 'worker'
+    full_name:       str
+    pass_number:     int
+    login:           str
+    password:        str
+    role_in_system:  str   # WAREHOUSE_MANAGER | WAREHOUSE_WORKER
+    position:        str = ""
+    phone:           str = ""
+    email:           str = ""
+    floor_number:    int = 0
+    office_number:   int = 0
+    workshop_number: int = 0
 
 class UserLogin(BaseModel):
-    email:    EmailStr
+    login:    str
     password: str
 
 @app.post("/auth/register", status_code=201)
 async def register(user: UserRegister):
-    # Логін stores email; check uniqueness
-    if await users_col.find_one({"Логін": user.email}):
-        raise HTTPException(status_code=400, detail="Email already registered")
-    doc = {
-        "Логін":     user.email,
-        "Пароль":    get_password_hash(user.password),
-        "Роль":      _role_to_ua(user.role),
-        "firstname": user.firstname,
-        "lastname":  user.lastname,
-    }
-    result = await users_col.insert_one(doc)
-    return {"message": "User registered successfully", "id": str(result.inserted_id)}
+    if user.role_in_system not in _VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"role_in_system must be one of {_VALID_ROLES}")
+
+    # Delegate registration to C# server (shared DiplomDB)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client_http:
+            cs_resp = await client_http.post(f"{CS_API}/api/auth/register", json={
+                "login":          user.login,
+                "password":       user.password,
+                "fullName":       user.full_name,
+                "roleInSystem":   user.role_in_system,
+                "passNumber":     user.pass_number,
+                "position":       user.position or "",
+                "phone":          user.phone or "",
+                "email":          user.email or "",
+                "workshopNumber": user.workshop_number or 0,
+                "floorNumber":    user.floor_number or 0,
+                "officeNumber":   user.office_number or 0,
+            })
+        cs_data = cs_resp.json()
+        if cs_resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=cs_data.get("message", "Registration failed"))
+        # Find the newly created user to return its id
+        new_user = await users_col.find_one({"login": user.login})
+        return {"message": "Account created. Waiting for manager activation.", "id": str(new_user["_id"]) if new_user else ""}
+    except httpx.RequestError:
+        # C# server unavailable — fallback: save directly to DiplomDB
+        if await users_col.find_one({"login": user.login}):
+            raise HTTPException(status_code=400, detail="Login already taken")
+        doc = {
+            "full_name": user.full_name, "pass_number": user.pass_number,
+            "role_in_system": user.role_in_system, "login": user.login,
+            "password_hash": get_password_hash(user.password),
+            "position": user.position, "phone": user.phone, "email": user.email,
+            "account_status": "REGISTRATION",
+            "floor_number": user.floor_number, "office_number": user.office_number,
+            "workshop_number": user.workshop_number, "created_at": datetime.utcnow(),
+        }
+        result = await users_col.insert_one(doc)
+        return {"message": "Account created. Waiting for manager activation.", "id": str(result.inserted_id)}
 
 @app.post("/auth/login")
 async def login(creds: UserLogin):
-    user = await users_col.find_one({"Логін": creds.email})
-    if not user or not verify_password(creds.password, user["Пароль"]):
+    # Try direct DB login first (DiplomDB, Python-hashed passwords)
+    user = await users_col.find_one({"login": creds.login})
+
+    if user and user.get("password_hash"):
+        if not verify_password(creds.password, user["password_hash"]):
+            raise HTTPException(status_code=400, detail="Invalid credentials")
+        status = user.get("account_status", "REGISTRATION")
+        if status != "ACTIVE":
+            raise HTTPException(status_code=403, detail="Account not activated. Contact your manager.")
+        await users_col.update_one({"_id": user["_id"]}, {"$set": {"last_login": datetime.utcnow()}})
+        token = create_access_token(data={"sub": user["login"], "role": user.get("role_in_system", "WAREHOUSE_WORKER")})
+        return {
+            "access_token": token, "token_type": "bearer",
+            "user": {"login": user["login"], "role": user.get("role_in_system", "WAREHOUSE_WORKER"),
+                     "full_name": user.get("full_name", ""), "account_status": status},
+        }
+
+    # Fallback: delegate to C# server (handles ASP.NET Identity hashes)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client_http:
+            cs_resp = await client_http.post(f"{CS_API}/api/auth/login",
+                                             json={"login": creds.login, "password": creds.password})
+        if cs_resp.status_code != 200:
+            cs_msg = cs_resp.json().get("message", "Invalid credentials")
+            if "inactive" in cs_msg.lower():
+                raise HTTPException(status_code=403, detail="Account not activated. Contact your manager.")
+            raise HTTPException(status_code=400, detail="Invalid credentials")
+
+        cs_token = cs_resp.json().get("token", "")
+        # Get user details from C#
+        async with httpx.AsyncClient(timeout=10) as client_http:
+            me_resp = await client_http.get(f"{CS_API}/api/auth/me",
+                                            headers={"Authorization": f"Bearer {cs_token}"})
+        if me_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail="Invalid credentials")
+        me = me_resp.json()
+        role = me.get("role", "WAREHOUSE_WORKER")
+        full_name = me.get("fullName", creds.login)
+
+        # Upsert user in DiplomDB so future logins work directly
+        await users_col.update_one(
+            {"login": creds.login},
+            {"$set": {"login": creds.login, "full_name": full_name, "role_in_system": role,
+                      "account_status": "ACTIVE", "last_login": datetime.utcnow()}},
+            upsert=True,
+        )
+        token = create_access_token(data={"sub": creds.login, "role": role})
+        return {
+            "access_token": token, "token_type": "bearer",
+            "user": {"login": creds.login, "role": role, "full_name": full_name, "account_status": "ACTIVE"},
+        }
+    except httpx.RequestError:
         raise HTTPException(status_code=400, detail="Invalid credentials")
-    role_en = _role_from_ua(user["Роль"])
-    token = create_access_token(data={"sub": user["Логін"], "role": role_en})
-    return {
-        "access_token": token,
-        "token_type":   "bearer",
-        "user": {
-            "email":     user["Логін"],
-            "role":      role_en,
-            "firstname": user.get("firstname", ""),
-            "lastname":  user.get("lastname",  ""),
-        },
-    }
 
 @app.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
-    user = await users_col.find_one({"Логін": current_user["email"]})
+    user = await users_col.find_one({"login": current_user["login"]})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user_from_db(user)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# USERS MANAGEMENT  (manager only)
+# ═══════════════════════════════════════════════════════════════════════════════
+@app.get("/users")
+async def list_users(_: dict = Depends(get_current_user)):
+    docs = await users_col.find().to_list(length=None)
+    return [user_from_db(d) for d in docs]
+
+@app.patch("/users/{uid}/activate")
+async def activate_user(uid: str, _: dict = Depends(require_manager)):
+    result = await users_col.update_one(
+        {"_id": to_oid(uid)},
+        {"$set": {"account_status": "ACTIVE"}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_from_db(await users_col.find_one({"_id": to_oid(uid)}))
+
+@app.patch("/users/{uid}/deactivate")
+async def deactivate_user(uid: str, _: dict = Depends(require_manager)):
+    result = await users_col.update_one(
+        {"_id": to_oid(uid)},
+        {"$set": {"account_status": "INACTIVE"}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_from_db(await users_col.find_one({"_id": to_oid(uid)}))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SUPPLIERS  — Suppliers class
@@ -672,7 +775,7 @@ async def create_procurement(body: ProcurementModel, current_user: dict = Depend
     doc["item_id"]    = to_oid(doc.get("item_id"))
     doc["supplier_id"] = to_oid(doc.get("supplier_id"))
     doc["created_by"] = None
-    user = await users_col.find_one({"Логін": current_user["email"]})
+    user = await users_col.find_one({"login": current_user["login"]})
     if user:
         doc["created_by"] = user["_id"]
     doc["date"] = doc.get("date") or datetime.utcnow().isoformat()

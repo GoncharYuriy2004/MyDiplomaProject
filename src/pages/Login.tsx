@@ -8,7 +8,7 @@ import warehouseBg from '../assets/warehouse_bg.jpg';
 import companyLogo from '../assets/logo.jpg';
 
 const Login = () => {
-    const [email, setEmail] = useState('');
+    const [loginVal, setLoginVal] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -23,17 +23,28 @@ const Login = () => {
         setIsLoading(true);
 
         try {
-            const success = await login(email, password);
-            if (success) {
-                // Role comes from the JWT — read it from stored user
+            const result = await login(loginVal, password);
+            if (result.success) {
                 const stored = localStorage.getItem('auth_user');
                 const role = stored ? JSON.parse(stored).role : 'worker';
                 navigate(`/${role}`);
             } else {
-                setError(t('login.error.wrongCredentials'));
+                const msg = (result.error ?? '').toLowerCase();
+                if (msg.includes('not activated') || msg.includes('не активовано') || msg.includes('contact your manager')) {
+                    setError(t('login.error.notActive'));
+                } else if (msg.includes('invalid credentials') || msg.includes('невірний')) {
+                    setError(t('login.error.wrongCredentials'));
+                } else {
+                    setError(result.error || t('login.error.general'));
+                }
             }
-        } catch {
-            setError(t('login.error.general'));
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : '';
+            if (msg.toLowerCase().includes('not activated') || msg.toLowerCase().includes('contact your manager')) {
+                setError(t('login.error.notActive'));
+            } else {
+                setError(t('login.error.general'));
+            }
         } finally {
             setIsLoading(false);
         }
@@ -114,8 +125,8 @@ const Login = () => {
                             <input
                                 type="text"
                                 placeholder={t('login.field.username')}
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={loginVal}
+                                onChange={(e) => setLoginVal(e.target.value)}
                                 className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-lg hover:bg-white"
                                 required
                             />

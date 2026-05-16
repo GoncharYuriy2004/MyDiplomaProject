@@ -4,9 +4,10 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { useItems } from '../../context/ItemsContext';
 import { apiCreateDocument } from '../../utils/api';
+import { translateItemName, translateUnit } from '../../utils/translateItem';
 
 const InventoryCheck = () => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { user } = useAuth();
     const { items } = useItems();
     const [actualStock, setActualStock] = useState<Record<string, number>>({});
@@ -111,7 +112,7 @@ const InventoryCheck = () => {
                                 return (
                                     <tr key={item._id} className={`hover:bg-slate-50/50 transition-colors ${hasDiff ? 'bg-orange-50/30' : ''}`}>
                                         <td className="px-6 py-4">
-                                            <p className="font-semibold text-slate-800">{item.name}</p>
+                                            <p className="font-semibold text-slate-800">{translateItemName(item.name, language)}</p>
                                             <p className="text-xs text-slate-500 mt-0.5">SKU: <span className="font-mono text-slate-700">{item.sku}</span></p>
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -120,7 +121,7 @@ const InventoryCheck = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center font-medium text-slate-600">
-                                            {item.current_stock} <span className="text-[10px] text-slate-400 uppercase">{item.unit}</span>
+                                            {item.current_stock} <span className="text-[10px] text-slate-400 uppercase">{translateUnit(item.unit, language)}</span>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <input

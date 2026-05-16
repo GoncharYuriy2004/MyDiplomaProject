@@ -1,12 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState } from 'react';
 import { type User } from '../data/mockData';
-import { apiLogin, apiRegister } from '../utils/api';
+import { apiLogin, apiRegister, apiMe } from '../utils/api';
 
 type AuthContextType = {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: { firstname: string; lastname: string; email: string; password: string; role: string }) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (userData: { full_name: string; pass_number: number; login: string; password: string; role_in_system: string; position?: string; phone?: string; email?: string; workshop_number?: number; floor_number?: number; office_number?: number }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 };
 
@@ -22,39 +22,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const _roleToShort = (r: string): 'manager' | 'worker' =>
+    r === 'WAREHOUSE_MANAGER' ? 'manager' : 'worker';
+
+  const login = async (loginVal: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const data = await apiLogin(email, password);
-      // Store JWT token first so apiMe() can use it
+      const data = await apiLogin(loginVal, password);
       localStorage.setItem('auth_token', data.access_token);
 
-      // Fetch real MongoDB _id from /auth/me; fall back to email if it fails
-      let id = data.user.email;
-      let firstname = data.user.firstname;
-      let lastname  = data.user.lastname;
+      let id        = data.user.login;
+      let full_name = data.user.full_name;
       try {
-        const me = await apiMe() as { _id: string; email: string; role: string; firstname: string; lastname: string };
+        const me = await apiMe() as { _id: string; login: string; full_name: string; role_in_system: string; account_status: string };
         id        = me._id;
-        firstname = me.firstname;
-        lastname  = me.lastname;
+        full_name = me.full_name;
       } catch { /* use login-response data */ }
 
       const mappedUser: User = {
-        _id:           id,
-        username:      data.user.email,
-        password_hash: '',
-        role:          data.user.role as 'manager' | 'worker',
-        full_name:     `${firstname} ${lastname}`,
+        _id:            id,
+        login:          data.user.login,
+        full_name,
+        role:           _roleToShort(data.user.role),
+        role_in_system: data.user.role,
+        account_status: data.user.account_status,
       };
       setUser(mappedUser);
       localStorage.setItem('auth_user', JSON.stringify(mappedUser));
-      return true;
-    } catch {
-      return false;
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      return { success: false, error: message };
     }
   };
 
-  const register = async (userData: { firstname: string; lastname: string; email: string; password: string; role: string }): Promise<{ success: boolean; error?: string }> => {
+  const register = async (userData: { full_name: string; pass_number: number; login: string; password: string; role_in_system: string; position?: string; phone?: string; email?: string; workshop_number?: number; floor_number?: number; office_number?: number }): Promise<{ success: boolean; error?: string }> => {
     try {
       await apiRegister(userData);
       return { success: true };

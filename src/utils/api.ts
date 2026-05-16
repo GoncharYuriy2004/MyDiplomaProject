@@ -12,19 +12,23 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, options);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail ?? 'Request failed');
+    const detail = err.detail;
+    const message = Array.isArray(detail)
+      ? detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join('; ')
+      : typeof detail === 'string' ? detail : 'Request failed';
+    throw new Error(message);
   }
   return res.json() as Promise<T>;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-export const apiLogin = (email: string, password: string) =>
-  request<{ access_token: string; token_type: string; user: { email: string; role: string; firstname: string; lastname: string } }>(
+export const apiLogin = (login: string, password: string) =>
+  request<{ access_token: string; token_type: string; user: { login: string; role: string; full_name: string; account_status: string } }>(
     '/auth/login',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) }
   );
 
-export const apiRegister = (data: { firstname: string; lastname: string; email: string; password: string; role: string }) =>
+export const apiRegister = (data: { full_name: string; pass_number: number; login: string; password: string; role_in_system: string; position?: string; phone?: string; email?: string; workshop_number?: number; floor_number?: number; office_number?: number }) =>
   request<{ message: string; id: string }>(
     '/auth/register',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
@@ -140,6 +144,16 @@ export const apiRejectDetailRequest = (id: string, approved_by: string) =>
     headers: authHeaders(),
     body: JSON.stringify({ approved_by }),
   });
+
+// ─── Users Management ────────────────────────────────────────────────────────
+export const apiGetUsers = () =>
+  request<any[]>('/users', { headers: authHeaders() });
+
+export const apiActivateUser = (id: string) =>
+  request<any>(`/users/${id}/activate`, { method: 'PATCH', headers: authHeaders() });
+
+export const apiDeactivateUser = (id: string) =>
+  request<any>(`/users/${id}/deactivate`, { method: 'PATCH', headers: authHeaders() });
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 export const apiGetStats = () =>

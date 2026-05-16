@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useItems } from '../../context/ItemsContext';
 import { apiCreateTransaction, apiGetTransactions } from '../../utils/api';
 import { downloadReturnActPDF } from '../../utils/pdfGenerator';
+import { translateItemName, translateUnit } from '../../utils/translateItem';
 
 type ReturnEntry = {
     id: string;
@@ -17,7 +18,7 @@ type ReturnEntry = {
 };
 
 const Returns = () => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { user } = useAuth();
     const { items, updateItem, refetch } = useItems();
 
@@ -136,7 +137,7 @@ const Returns = () => {
                                 <option value="" disabled>{t('returns.placeholder.item')}</option>
                                 {items.map(p => (
                                     <option key={p._id} value={p._id}>
-                                        {p.name} (SKU: {p.sku}) — {p.current_stock} {p.unit} {t('returns.inStock')}
+                                        {translateItemName(p.name, language)} (SKU: {p.sku}) — {p.current_stock} {translateUnit(p.unit, language)} {t('returns.inStock')}
                                     </option>
                                 ))}
                             </select>
@@ -194,7 +195,7 @@ const Returns = () => {
                             <div className="p-3 bg-teal-50 border border-teal-100 rounded-lg text-sm text-teal-800 flex items-center gap-2">
                                 <CheckCircle2 size={14} className="text-teal-500 shrink-0" />
                                 <span>
-                                    <strong>{selectedProductData.name}</strong> — {t('returns.currentStock')}: <strong>{selectedProductData.current_stock} {selectedProductData.unit}</strong>
+                                    <strong>{translateItemName(selectedProductData.name, language)}</strong> — {t('returns.currentStock')}: <strong>{selectedProductData.current_stock} {translateUnit(selectedProductData.unit, language)}</strong>
                                 </span>
                             </div>
                         )}
@@ -230,9 +231,9 @@ const Returns = () => {
                                             <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded uppercase">{ret.id}</span>
                                             <span className="text-[10px] text-slate-400 italic font-mono">{ret.date}</span>
                                         </div>
-                                        <p className="text-xs font-bold text-slate-700">{ret.productName}</p>
+                                        <p className="text-xs font-bold text-slate-700">{translateItemName(ret.productName, language)}</p>
                                         <p className="text-[10px] text-slate-500 mt-1 mb-2">
-                                            {ret.quantity} шт. • Від: {ret.returnedFrom}
+                                            {ret.quantity} {translateUnit(ret.unit || 'шт', language)} • Від: {ret.returnedFrom}
                                         </p>
                                         <button
                                             onClick={() => downloadReturnActPDF({ docId: ret.id, date: ret.date, itemName: ret.productName, sku: ret.sku, unit: ret.unit, quantity: ret.quantity, returnedFrom: ret.returnedFrom })}
