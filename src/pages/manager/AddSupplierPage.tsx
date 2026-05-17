@@ -84,7 +84,7 @@ const AddSupplierPage = () => {
                     className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors group px-2 py-1 rounded-lg hover:bg-white"
                 >
                     <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="font-medium">{t('acts.filter.all')}</span>
+                    <span className="font-medium">{t('suppliers.title')}</span>
                 </button>
 
                 {/* Main Card */}

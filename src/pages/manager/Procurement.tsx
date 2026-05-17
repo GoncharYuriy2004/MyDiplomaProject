@@ -61,7 +61,6 @@ const Procurement = () => {
         });
     }, [orders, searchQuery, statusFilter]);
 
-    const lowStockItems = items.filter(p => p.current_stock < p.min_stock);
 
     useEffect(() => {
         apiGetProcurement()
