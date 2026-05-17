@@ -843,47 +843,37 @@ async def list_detail_requests(_: dict = Depends(get_current_user)):
     docs = await detail_requests_col.find().sort("created_at", -1).to_list(length=None)
     return [detail_request_from_db(d) for d in docs]
 
+async def _update_detail_request_status(rid: str, fields: dict) -> dict:
+    """Update a detail-request status, handling both ObjectId and string _id (C# compat)."""
+    oid = safe_to_oid(rid)
+    # Try ObjectId first, fall back to raw string (C# may store _id as string)
+    for id_val in ([oid, rid] if oid != rid else [rid]):
+        result = await detail_requests_col.update_one({"_id": id_val}, {"$set": fields})
+        if result.matched_count > 0:
+            doc = await detail_requests_col.find_one({"_id": id_val})
+            return detail_request_from_db(doc)
+    raise HTTPException(status_code=404, detail="Request not found")
+
 @app.patch("/detail-requests/{rid}/approve")
 async def approve_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
-    result = await detail_requests_col.update_one(
-        {"_id": to_oid(rid)},
-        {"$set": {
-            "status":      "APPROVED",
-            "approved_by": body.approved_by,
-            "approved_at": datetime.utcnow().isoformat(),
-        }},
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Request not found")
-    doc = await detail_requests_col.find_one({"_id": to_oid(rid)})
-    return detail_request_from_db(doc)
+    return await _update_detail_request_status(rid, {
+        "status":      "APPROVED",
+        "approved_by": body.approved_by,
+        "approved_at": datetime.utcnow().isoformat(),
+    })
 
 @app.patch("/detail-requests/{rid}/reject")
 async def reject_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
-    result = await detail_requests_col.update_one(
-        {"_id": to_oid(rid)},
-        {"$set": {
-            "status":      "REJECTED",
-            "approved_by": body.approved_by,
-            "approved_at": datetime.utcnow().isoformat(),
-        }},
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Request not found")
-    doc = await detail_requests_col.find_one({"_id": to_oid(rid)})
-    return detail_request_from_db(doc)
+    return await _update_detail_request_status(rid, {
+        "status":      "REJECTED",
+        "approved_by": body.approved_by,
+        "approved_at": datetime.utcnow().isoformat(),
+    })
 
 @app.patch("/detail-requests/{rid}/wait")
 async def wait_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
-    result = await detail_requests_col.update_one(
-        {"_id": to_oid(rid)},
-        {"$set": {
-            "status":      "WAITING",
-            "approved_by": body.approved_by,
-            "approved_at": datetime.utcnow().isoformat(),
-        }},
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Request not found")
-    doc = await detail_requests_col.find_one({"_id": to_oid(rid)})
-    return detail_request_from_db(doc)
+    return await _update_detail_request_status(rid, {
+        "status":      "WAITING",
+        "approved_by": body.approved_by,
+        "approved_at": datetime.utcnow().isoformat(),
+    })
