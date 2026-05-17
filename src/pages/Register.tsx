@@ -233,7 +233,7 @@ const Register = () => {
 
                         <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
                             <div className="flex-1 space-y-1.5 w-full">
-                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.position')}</label>
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.role')}</label>
                                 <div className="relative">
                                     <select
                                         name="role_in_system"
@@ -246,9 +246,34 @@ const Register = () => {
                                         <option value="WAREHOUSE_MANAGER">{t('role.warehouse_manager')}</option>
                                     </select>
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                     </div>
                                 </div>
+                            </div>
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.position')}</label>
+                                <input
+                                    type="text"
+                                    name="position"
+                                    placeholder={t('register.field.position')}
+                                    value={formData.position}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
+                            <div className="flex-1 space-y-1.5 w-full">
+                                <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.email')}</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    placeholder={t('register.field.email')}
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
+                                />
                             </div>
                             <div className="flex-1 space-y-1.5 w-full">
                                 <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.phone')}</label>
@@ -261,18 +286,6 @@ const Register = () => {
                                     className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
                                 />
                             </div>
-                        </div>
-
-                        <div className="space-y-1.5 w-full">
-                            <label className="text-sm font-bold text-slate-700 ml-1">{t('register.field.email')}</label>
-                            <input
-                                type="email"
-                                name="email"
-                                placeholder={t('register.field.email')}
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold text-[15px] hover:bg-white"
-                            />
                         </div>
 
                         <div className="flex gap-4 flex-col sm:flex-row sm:items-end">
