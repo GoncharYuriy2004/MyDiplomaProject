@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ban, FileWarning, ArrowRight, FileText, Search, CheckCircle2, FileDown } from 'lucide-react';
+import { Ban, FileWarning, ArrowRight, FileText, Search, CheckCircle2, FileDown, XCircle } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { useItems } from '../../context/ItemsContext';
@@ -25,6 +25,8 @@ const WriteOffs = () => {
     const { items, updateItem, refetch } = useItems();
 
     const [selectedProduct, setSelectedProduct] = useState('');
+    const [itemSearch, setItemSearch]           = useState('');
+    const [itemDropOpen, setItemDropOpen]       = useState(false);
     const [quantity, setQuantity] = useState('');
     const [reason, setReason] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +51,12 @@ const WriteOffs = () => {
     }, []);
 
     const selectedProductData = items.find(p => p._id === selectedProduct);
+
+    const filteredItems = items.filter(p =>
+        !itemSearch ||
+        p.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+        p.sku.toLowerCase().includes(itemSearch.toLowerCase())
+    );
 
     const filteredDocs = recentDocs.filter(doc =>
         doc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,6 +127,7 @@ const WriteOffs = () => {
             setTimeout(() => setSuccessMessage(''), 6000);
 
             setSelectedProduct('');
+            setItemSearch('');
             setQuantity('');
             setReason('');
         } catch (err: any) {
@@ -156,19 +165,54 @@ const WriteOffs = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">{t('writeoffs.field.item')}</label>
-                            <select
-                                required
-                                value={selectedProduct}
-                                onChange={(e) => setSelectedProduct(e.target.value)}
-                                className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                            >
-                                <option value="" disabled>{t('writeoffs.placeholder.item')}</option>
-                                {items.map(p => (
-                                    <option key={p._id} value={p._id} disabled={p.current_stock === 0}>
-                                        {translateItemName(p.name, language)} (SKU: {p.sku}) — {p.current_stock} {translateUnit(p.unit, language)}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={itemSearch}
+                                    onChange={e => { setItemSearch(e.target.value); setSelectedProduct(''); setItemDropOpen(true); }}
+                                    onFocus={() => setItemDropOpen(true)}
+                                    onBlur={() => setTimeout(() => setItemDropOpen(false), 150)}
+                                    placeholder={t('writeoffs.placeholder.item')}
+                                    className="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none transition-all"
+                                />
+                                {selectedProduct && (
+                                    <button type="button"
+                                        onMouseDown={() => { setSelectedProduct(''); setItemSearch(''); setItemDropOpen(true); }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <XCircle size={15} />
+                                    </button>
+                                )}
+                                {itemDropOpen && (
+                                    <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                                        {filteredItems.length === 0 ? (
+                                            <p className="text-xs text-slate-400 text-center py-4">Нічого не знайдено</p>
+                                        ) : filteredItems.map(p => (
+                                            <button key={p._id} type="button"
+                                                onMouseDown={() => {
+                                                    setSelectedProduct(p._id);
+                                                    setItemSearch(`${translateItemName(p.name, language)} (${p.sku})`);
+                                                    setItemDropOpen(false);
+                                                }}
+                                                disabled={p.current_stock === 0}
+                                                className={`w-full text-left px-3 py-2 text-sm hover:bg-orange-50 transition-colors flex items-center justify-between gap-2 ${p.current_stock === 0 ? 'opacity-40' : ''}`}>
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-slate-800 truncate">{translateItemName(p.name, language)}</p>
+                                                    <p className="text-[11px] text-slate-400 font-mono">{p.sku}</p>
+                                                </div>
+                                                <span className={`text-[11px] font-bold shrink-0 px-1.5 py-0.5 rounded ${p.current_stock > 0 ? 'bg-orange-50 text-orange-700' : 'bg-red-50 text-red-600'}`}>
+                                                    {p.current_stock} {translateUnit(p.unit, language)}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {selectedProductData && (
+                                <p className="text-xs mt-1 text-slate-500">
+                                    На складі: <span className="font-bold text-orange-700">{selectedProductData.current_stock}</span> {translateUnit(selectedProductData.unit, language)} · {selectedProductData.unit_price} грн/{translateUnit('шт', language)}
+                                </p>
+                            )}
                         </div>
 
                         <div>
