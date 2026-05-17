@@ -6,7 +6,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
 } from 'recharts';
-import { Calculator, TrendingUp, Tag, AlertTriangle, BookOpen } from 'lucide-react';
+import { Calculator, TrendingUp, Tag, AlertTriangle, BookOpen, Search, XCircle } from 'lucide-react';
 import AnalyticsGuide from '../../components/AnalyticsGuide';
 
 // ─── Math ───────────────────────────────────────────────────────────────────
@@ -155,6 +155,13 @@ export default function AnalyticsPage() {
   const [w2, setW2] = useState('0.35');
   const [w3, setW3] = useState('0.25');
   const [poisItemId, setPoisItemId] = useState('');
+
+  // Search state
+  const [optSearch,  setOptSearch]  = useState('');
+  const [poisSearch, setPoisSearch] = useState('');
+  const [abcSearch,  setAbcSearch]  = useState('');
+  const [xyzSearch,  setXyzSearch]  = useState('');
+  const [ciSearch,   setCiSearch]   = useState('');
 
   // ─── Aggregate: monthly demand (out + write_off) ─────────────────────────
   const realMonthly = useMemo(() => {
@@ -406,10 +413,19 @@ export default function AnalyticsPage() {
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
             <p className="text-xs font-semibold text-blue-800">{t('analytics.opt.autoFill.label')}</p>
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" value={optSearch} onChange={e => setOptSearch(e.target.value)}
+                placeholder="Пошук МтаК..."
+                className="w-full pl-8 pr-7 py-1.5 text-sm border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              {optSearch && <button onClick={() => setOptSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><XCircle size={13} /></button>}
+            </div>
             <select value={optItemId} onChange={e => setOptItemId(e.target.value)}
               className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">{t('analytics.opt.autoFill.manual')}</option>
-              {items.map(item => (
+              {items
+                .filter(item => !optSearch.trim() || item.name.toLowerCase().includes(optSearch.toLowerCase()) || item.sku.toLowerCase().includes(optSearch.toLowerCase()))
+                .map(item => (
                 <option key={item._id} value={item._id}>
                   {item.name} ({item.sku}) — {t('analytics.opt.issued')} {Math.round(itemDemandMap[item._id] ?? 0)} {language === 'en' ? 'units' : 'од.'}
                 </option>
@@ -605,11 +621,19 @@ export default function AnalyticsPage() {
         <div className="space-y-4">
           {/* #9 ABC */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">9</span>
-              <div>
-                <h3 className="font-semibold text-gray-900 text-sm">{t('analytics.class.abc.title')}</h3>
-                <p className="text-xs font-mono text-gray-400">wᵢ = Qᵢ·Pᵢ / ΣQⱼ·Pⱼ · {language === 'en' ? 'Data: current stock × price' : 'Дані: поточний залишок × ціна'}</p>
+            <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">9</span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">{t('analytics.class.abc.title')}</h3>
+                  <p className="text-xs font-mono text-gray-400">wᵢ = Qᵢ·Pᵢ / ΣQⱼ·Pⱼ · {language === 'en' ? 'Data: current stock × price' : 'Дані: поточний залишок × ціна'}</p>
+                </div>
+              </div>
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" value={abcSearch} onChange={e => setAbcSearch(e.target.value)}
+                  placeholder="Пошук..." className="pl-8 pr-7 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-44" />
+                {abcSearch && <button onClick={() => setAbcSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><XCircle size={13} /></button>}
               </div>
             </div>
             {abcR.length > 0 ? (
@@ -625,7 +649,7 @@ export default function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {abcR.map(r => (
+                    {abcR.filter(r => !abcSearch.trim() || r.name.toLowerCase().includes(abcSearch.toLowerCase())).map(r => (
                       <tr key={r.rank} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="py-1.5 text-gray-400 text-xs">{r.rank}</td>
                         <td className="py-1.5">{r.name}</td>
@@ -660,7 +684,15 @@ export default function AnalyticsPage() {
                   <p className="text-xs font-mono text-gray-400">CV = σ / μ · {language === 'en' ? 'from real transactions (issuance + write-offs)' : 'за реальними транзакціями (видача + списання)'}</p>
                 </div>
               </div>
-              {txLoading && <span className="text-xs text-blue-500 animate-pulse">{t('analytics.class.xyz.loading')}</span>}
+              <div className="flex items-center gap-2">
+                {txLoading && <span className="text-xs text-blue-500 animate-pulse">{t('analytics.class.xyz.loading')}</span>}
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="text" value={xyzSearch} onChange={e => setXyzSearch(e.target.value)}
+                    placeholder="Пошук..." className="pl-8 pr-7 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-44" />
+                  {xyzSearch && <button onClick={() => setXyzSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><XCircle size={13} /></button>}
+                </div>
+              </div>
             </div>
             {xyzR.length > 0 ? (
               <>
@@ -674,7 +706,7 @@ export default function AnalyticsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {xyzR.map((r, i) => (
+                    {xyzR.filter(r => !xyzSearch.trim() || r.name.toLowerCase().includes(xyzSearch.toLowerCase())).map((r, i) => (
                       <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="py-1.5">{r.name}</td>
                         <td className="py-1.5 text-right text-gray-500">{r.noData ? '—' : r.mean}</td>
@@ -714,14 +746,23 @@ export default function AnalyticsPage() {
                 <p className="text-xs font-mono text-gray-400">P(X=k) = λᵏ·e⁻λ / k!</p>
               </div>
             </div>
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-500 mb-1">
+            <div className="mb-4 space-y-2">
+              <label className="block text-xs font-medium text-gray-500">
                 {t('analytics.risk.poisson.selectLabel')}
               </label>
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" value={poisSearch} onChange={e => setPoisSearch(e.target.value)}
+                  placeholder="Пошук МтаК..."
+                  className="w-full pl-8 pr-7 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                {poisSearch && <button onClick={() => setPoisSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><XCircle size={13} /></button>}
+              </div>
               <select value={poisItemId} onChange={e => setPoisItemId(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">{t('analytics.risk.poisson.allItems')}</option>
-                {items.filter(i => i.status === 'available').map(item => (
+                {items
+                  .filter(i => i.status === 'available' && (!poisSearch.trim() || i.name.toLowerCase().includes(poisSearch.toLowerCase()) || i.sku.toLowerCase().includes(poisSearch.toLowerCase())))
+                  .map(item => (
                   <option key={item._id} value={item._id}>
                     {item.name} — {t('analytics.risk.poisson.stock')} {item.current_stock} {item.unit} · {t('analytics.risk.poisson.issued')} {Math.round(itemDemandMap[item._id] ?? 0)} {language === 'en' ? 'units' : 'од.'}
                   </option>
@@ -766,11 +807,19 @@ export default function AnalyticsPage() {
 
           {/* #12 Criticality Index */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">12</span>
-              <div>
-                <h3 className="font-semibold text-gray-900 text-sm">{t('analytics.risk.ci.title')}</h3>
-                <p className="text-xs font-mono text-gray-400">CI = W₁·(1/r) + W₂·C_norm + W₃·0.5 · {language === 'en' ? 'Data: stock, min_stock, price' : 'Дані: залишок, min_stock, ціна'}</p>
+            <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">12</span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">{t('analytics.risk.ci.title')}</h3>
+                  <p className="text-xs font-mono text-gray-400">CI = W₁·(1/r) + W₂·C_norm + W₃·0.5 · {language === 'en' ? 'Data: stock, min_stock, price' : 'Дані: залишок, min_stock, ціна'}</p>
+                </div>
+              </div>
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" value={ciSearch} onChange={e => setCiSearch(e.target.value)}
+                  placeholder="Пошук..." className="pl-8 pr-7 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-44" />
+                {ciSearch && <button onClick={() => setCiSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><XCircle size={13} /></button>}
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3 mb-4">
@@ -789,7 +838,7 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ciR.map((r, i) => (
+                  {ciR.filter(r => !ciSearch.trim() || r.name.toLowerCase().includes(ciSearch.toLowerCase())).map((r, i) => (
                     <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-1.5">{r.name}</td>
                       <td className="py-1.5 text-right text-gray-500">{r.sr}</td>
