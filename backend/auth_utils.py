@@ -9,7 +9,7 @@ from jose import jwt
 
 SECRET_KEY  = "your-secret-key-should-be-very-secure"
 ALGORITHM   = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 днів
 
 
 def get_password_hash(plain_password: str) -> str:

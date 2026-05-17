@@ -16,7 +16,6 @@ import Procurement  from './pages/manager/Procurement';
 import Acts         from './pages/manager/Acts';
 import Approvals    from './pages/manager/Approvals';
 import AnalyticsPage from './pages/manager/AnalyticsPage';
-import UsersPage from './pages/manager/UsersPage';
 
 // Worker Pages
 import WorkerDashboardPage from './pages/worker/WorkerDashboardPage';
@@ -48,7 +47,6 @@ function App() {
                     <Route path="documents"        element={<Acts />} />
                     <Route path="approvals"        element={<Approvals />} />
                     <Route path="analytics"        element={<AnalyticsPage />} />
-                    <Route path="users"            element={<UsersPage />} />
                   </Route>
 
                   {/* Worker Routes */}
