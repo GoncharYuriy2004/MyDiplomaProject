@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { downloadSummaryReportPDF } from '../../utils/pdfGenerator';
 import { useLanguage } from '../../context/LanguageContext';
+import { translateCategory } from '../../utils/translateItem';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -118,7 +119,6 @@ const ManagerDashboardPage = () => {
         });
     }, [transactions, dateFilter, MONTH_LABELS]);
 
-    // ── Pie data ──────────────────────────────────────────────────────────────
     const pieData = useMemo(() => {
         if (selectedMetric === 'in' || selectedMetric === 'out' || selectedMetric === 'write_off') {
             // Per-category transaction quantity
@@ -128,11 +128,11 @@ const ManagerDashboardPage = () => {
                 const qty = transactions
                     .filter(tx => tx.type === selectedMetric && ids.has(tx.item_id))
                     .reduce((s: number, t: any) => s + (t.quantity ?? 0), 0);
-                return { category: cat, qty };
+                return { category: translateCategory(cat, language), qty };
             }).filter(r => r.qty > 0);
         }
-        return summaryData.map(r => ({ category: r.category, qty: r.totalStock }));
-    }, [categories, items, transactions, selectedMetric, summaryData]);
+        return summaryData.map(r => ({ category: translateCategory(r.category, language), qty: r.totalStock }));
+    }, [categories, items, transactions, selectedMetric, summaryData, language]);
 
     // ── Render chart ──────────────────────────────────────────────────────────
     const metricLabel = t(`manager.analytics.metric.${selectedMetric}`);
@@ -378,7 +378,7 @@ const ManagerDashboardPage = () => {
                             <tbody className="divide-y divide-slate-50">
                                 {summaryData.map(row => (
                                     <tr key={row.category} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-slate-700">{row.category}</td>
+                                        <td className="px-6 py-4 font-bold text-slate-700">{translateCategory(row.category, language)}</td>
                                         <td className="px-6 py-4 text-center text-slate-600">{row.count}</td>
                                         <td className="px-6 py-4 text-center">
                                             <span className="px-2 py-1 bg-slate-100 rounded text-slate-700 text-sm font-medium">

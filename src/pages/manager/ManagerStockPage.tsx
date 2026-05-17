@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, PackageSearch, AlertTriangle, TrendingDown, Layers, DollarSign, XCircle } from 'lucide-react';
 import { useItems } from '../../context/ItemsContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { translateItemName, translateUnit } from '../../utils/translateItem';
+import { translateItemName, translateUnit, translateCategory } from '../../utils/translateItem';
 
 // ── Stock level helpers ────────────────────────────────────────────────────────
 function stockLevel(current: number, min: number): 'empty' | 'low' | 'ok' {
@@ -158,7 +158,7 @@ const ManagerStockPage = () => {
                             onClick={() => setCategoryFilter(prev => prev === cat ? '' : cat)}
                             className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${categoryFilter === cat ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
-                            <span>{cat}</span>
+                            <span>{translateCategory(cat, language)}</span>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${categoryFilter === cat ? 'bg-white/20 text-white' : 'bg-white text-slate-500'}`}>{count}</span>
                             {low > 0 && (
                                 <span className="flex items-center gap-0.5 text-amber-500">
@@ -265,7 +265,7 @@ const ManagerStockPage = () => {
                                             </td>
                                             <td className="px-5 py-3 text-xs text-slate-500 font-mono">{item.sku}</td>
                                             <td className="px-5 py-3">
-                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">{item.category}</span>
+                                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">{translateCategory(item.category, language)}</span>
                                             </td>
                                             <td className="px-5 py-3 text-sm font-bold text-right">
                                                 <span className={lvl === 'empty' ? 'text-red-600' : lvl === 'low' ? 'text-amber-600' : 'text-slate-800'}>

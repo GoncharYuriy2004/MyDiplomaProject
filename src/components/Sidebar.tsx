@@ -29,12 +29,12 @@ const Sidebar = () => {
     };
 
     const managerLinks = [
-        { name: t('sidebar.dashboard'),     path: '/manager',           icon: <BarChart3 size={20} />,     exact: true },
         { name: t('sidebar.stockOverview'), path: '/manager/stock',     icon: <PackageSearch size={20} /> },
         { name: t('sidebar.suppliers'),     path: '/manager/suppliers', icon: <Users size={20} /> },
         { name: t('sidebar.procurement'),   path: '/manager/procurement', icon: <ShoppingCart size={20} /> },
         { name: t('sidebar.documents'),     path: '/manager/documents', icon: <FileText size={20} /> },
         { name: t('sidebar.approvals'),     path: '/manager/approvals', icon: <CheckSquare size={20} /> },
+        { name: t('sidebar.dashboard'),     path: '/manager',           icon: <BarChart3 size={20} />,     exact: true },
         { name: t('sidebar.analytics'),     path: '/manager/analytics', icon: <BrainCircuit size={20} /> },
     ];
 

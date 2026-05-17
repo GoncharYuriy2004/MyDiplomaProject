@@ -76,3 +76,26 @@ export const translateUnit = (unit: string, language: string): string => {
     };
     return units[unit] || unit;
 };
+
+export const translateCategory = (category: string, language: string): string => {
+    if (language !== 'uk' || !category) return category;
+    
+    const cats: Record<string, string> = {
+        "cpu": "Процесор",
+        "ram": "Оперативна пам'ять",
+        "storage": "Накопичувач",
+        "display": "Монітор",
+        "networking": "Мережеве обладнання",
+        "laptop": "Ноутбук",
+        "power": "Живлення",
+        "peripheral": "Периферія",
+        "accessory": "Аксесуари",
+        "cable": "Кабелі",
+        "tool": "Інструменти",
+        "server": "Сервер",
+        "motherboard": "Материнська плата",
+        "other": "Інше",
+    };
+    
+    return cats[category.toLowerCase()] || category;
+};
