@@ -3,6 +3,7 @@ import { Plus, Clock, CheckCircle2, Truck, Trash2 } from 'lucide-react';
 import { useItems } from '../../context/ItemsContext';
 import { useSuppliers } from '../../context/SupplierContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { translateItemName } from '../../utils/translateItem';
 import {
     apiGetProcurement,
     apiCreateProcurement,
@@ -24,8 +25,8 @@ type Order = {
 };
 
 const Procurement = () => {
-    const { t } = useLanguage();
-    const { items } = useItems();
+    const { t, language } = useLanguage();
+    const { items, refetch } = useItems();
     const { suppliers } = useSuppliers();
 
     const [orders, setOrders] = useState<Order[]>([]);
@@ -37,7 +38,7 @@ const Procurement = () => {
     const [errorMessage, setErrorMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const lowStockItems = items.filter(p => p.current_stock <= p.min_stock);
+    const lowStockItems = items.filter(p => p.current_stock < p.min_stock);
 
     useEffect(() => {
         apiGetProcurement()
@@ -88,6 +89,8 @@ const Procurement = () => {
         try {
             const updated = await apiUpdateProcurementStatus(id, newStatus);
             setOrders(prev => prev.map(o => o._id === id ? updated : o));
+            // Re-fetch items so stock overview reflects the new quantity immediately
+            if (newStatus === 'received') await refetch();
         } catch (err: any) {
             showMessage(err.message ?? 'Помилка оновлення статусу', true);
         }
@@ -156,7 +159,7 @@ const Procurement = () => {
                                 onClick={() => { setSelectedItemId(item._id); setQuantity((item.min_stock * 2).toString()); }}
                                 className="px-3 py-1.5 bg-white border border-orange-200 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition-colors shadow-sm"
                             >
-                                Поповнити {item.name}
+                                {t('procurement.replenish') || 'Поповнити'} {translateItemName(item.name, language)}
                             </button>
                         ))}
                     </div>

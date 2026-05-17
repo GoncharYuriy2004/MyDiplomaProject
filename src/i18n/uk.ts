@@ -260,6 +260,8 @@ export const uk = {
     'procurement.form.supplier': 'Постачальник',
     'procurement.form.btn.create': 'Створити чернетку PO',
     'procurement.msg.inStock': 'На складі',
+    'procurement.msg.created': 'Замовлення створено!',
+    'procurement.replenish': 'Поповнити',
 
     // Acts & Invoices
     'acts.title': 'Акти та рахунки',

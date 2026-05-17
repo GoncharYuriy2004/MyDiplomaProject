@@ -775,12 +775,35 @@ async def update_procurement_status(pid: str, status: str, _: dict = Depends(req
     allowed = {"planned", "ordered", "received"}
     if status not in allowed:
         raise HTTPException(status_code=400, detail=f"Status must be one of: {allowed}")
-    result = await procurement_col.update_one(
+
+    order = await procurement_col.find_one({"_id": to_oid(pid)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    await procurement_col.update_one(
         {"_id": to_oid(pid)},
         {"$set": {"status": status}},
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Order not found")
+
+    # When order is received for the first time — increment item stock and create a transaction
+    if status == "received" and order.get("status") != "received":
+        item_oid = order.get("item_id")
+        qty = float(order.get("quantity", 0))
+        if item_oid and qty > 0:
+            await items_col.update_one(
+                {"_id": item_oid},
+                {"$inc": {"кількість": qty}},
+            )
+            await transactions_col.insert_one({
+                "type":        "in",
+                "item_id":     item_oid,
+                "quantity":    qty,
+                "date":        datetime.utcnow().isoformat(),
+                "notes":       f"Надходження за замовленням закупівлі",
+                "user_id":     None,
+                "document_id": None,
+            })
+
     return procurement_from_db(await procurement_col.find_one({"_id": to_oid(pid)}))
 
 @app.delete("/procurement/{pid}")

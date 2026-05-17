@@ -260,6 +260,8 @@ export const en = {
     'procurement.form.supplier': 'Supplier',
     'procurement.form.btn.create': 'Create Draft PO',
     'procurement.msg.inStock': 'In stock',
+    'procurement.msg.created': 'Order created!',
+    'procurement.replenish': 'Replenish',
 
     // Acts & Invoices
     'acts.title': 'Acts & Invoices',
