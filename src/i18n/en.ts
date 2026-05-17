@@ -266,6 +266,7 @@ export const en = {
     // Acts & Invoices
     'acts.title': 'Acts & Invoices',
     'acts.subtitle': 'View, track, and download PDFs for official documents',
+    'acts.search': 'Search by type, ID, recipient, item...',
     'acts.status.pending': 'Pending',
     'acts.status.approved': 'Approved',
     'acts.status.rejected': 'Rejected',

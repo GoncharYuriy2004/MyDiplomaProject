@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Check, X, AlertCircle, CheckCircle2, ClipboardList, AlertTriangle, UserCheck, RefreshCw } from 'lucide-react';
+import { Check, X, AlertCircle, CheckCircle2, ClipboardList, AlertTriangle, UserCheck, RefreshCw, Search, XCircle } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDocuments } from '../../context/DocumentsContext';
@@ -36,6 +36,7 @@ const Approvals = () => {
     const [approvingDoc, setApprovingDoc] = useState<any | null>(null);
     const [checkedCriteria, setCheckedCriteria] = useState<Record<string, boolean>>({});
     const [busy, setBusy] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // ── Pending user registrations ────────────────────────────────────────
     const [pendingUsers, setPendingUsers] = useState<any[]>([]);
@@ -60,9 +61,20 @@ const Approvals = () => {
         finally { setBusy(false); }
     };
 
-    const pendingDocs = documents.filter(
-        (doc) => doc.status === 'pending' && (doc.type === 'act_writeoff' || doc.type === 'discrepancy_act')
-    );
+    const pendingDocs = documents.filter(doc => {
+        const isPending = doc.status === 'pending' && (doc.type === 'act_writeoff' || doc.type === 'discrepancy_act');
+        if (!isPending) return false;
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            getDocTypeName(doc.type).toLowerCase().includes(q) ||
+            doc._id.toLowerCase().includes(q) ||
+            (doc.item_name  && String(doc.item_name).toLowerCase().includes(q)) ||
+            (doc.reason     && String(doc.reason).toLowerCase().includes(q)) ||
+            (doc.notes      && String(doc.notes).toLowerCase().includes(q)) ||
+            (doc.created_at && new Date(doc.created_at).toLocaleString('uk-UA').toLowerCase().includes(q))
+        );
+    });
 
     const allChecked = APPROVAL_CRITERIA.every(c => checkedCriteria[c.id]);
 
@@ -289,6 +301,35 @@ const Approvals = () => {
                 </div>
             )}
 
+            {/* Search bar for documents */}
+            {!loading && documents.some(d => d.status === 'pending' && (d.type === 'act_writeoff' || d.type === 'discrepancy_act')) && (
+                <div className="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-3 flex items-center gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="Пошук по типу, ID, МтаК, причині..."
+                            className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-slate-50"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                <XCircle size={14} />
+                            </button>
+                        )}
+                    </div>
+                    {searchQuery && (
+                        <span className="text-xs text-slate-500">
+                            Знайдено: <span className="font-semibold text-slate-700">{pendingDocs.length}</span>
+                        </span>
+                    )}
+                </div>
+            )}
+
             {/* Document list */}
             {loading ? (
                 <div className="bg-white rounded-xl p-12 text-center text-slate-400">Завантаження...</div>
@@ -297,8 +338,14 @@ const Approvals = () => {
                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 mb-4">
                         <CheckCircle2 size={32} />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800">{t('approvals.empty.title')}</h3>
-                    <p className="text-slate-500 mt-1 max-w-sm">{t('approvals.empty.subtitle')}</p>
+                    <h3 className="text-lg font-bold text-slate-800">
+                        {searchQuery ? 'Нічого не знайдено' : t('approvals.empty.title')}
+                    </h3>
+                    <p className="text-slate-500 mt-1 max-w-sm">
+                        {searchQuery
+                            ? `Немає збігів для «${searchQuery}»`
+                            : t('approvals.empty.subtitle')}
+                    </p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4">

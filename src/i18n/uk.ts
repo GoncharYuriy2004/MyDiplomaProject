@@ -266,6 +266,7 @@ export const uk = {
     // Acts & Invoices
     'acts.title': 'Акти та рахунки',
     'acts.subtitle': 'Перегляд, відстеження та завантаження PDF-файлів офіційних документів',
+    'acts.search': 'Пошук по типу, ID, отримувачу, МтаК...',
     'acts.status.pending': 'Очікує',
     'acts.status.approved': 'Затверджено',
     'acts.status.rejected': 'Відхилено',

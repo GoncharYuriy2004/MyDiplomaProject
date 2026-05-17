@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileDown, FileText, CheckCircle2, Clock, XCircle, Package, AlertTriangle, ClipboardList, RefreshCw } from 'lucide-react';
+import { FileDown, FileText, CheckCircle2, Clock, XCircle, Package, AlertTriangle, ClipboardList, RefreshCw, Search } from 'lucide-react';
 import { downloadInvoicePDF } from '../../utils/pdfGenerator';
 import { useLanguage } from '../../context/LanguageContext';
 import { useDocuments } from '../../context/DocumentsContext';
@@ -18,6 +18,7 @@ const Acts = () => {
     const { t } = useLanguage();
     const { documents, loading, refetch } = useDocuments();
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
     const handleRefresh = async () => {
@@ -25,9 +26,21 @@ const Acts = () => {
         try { await refetch(); } finally { setRefreshing(false); }
     };
 
-    const filteredDocs = activeFilter === 'all'
-        ? documents
-        : documents.filter(doc => doc.type === activeFilter);
+    const filteredDocs = documents.filter(doc => {
+        const matchType = activeFilter === 'all' || doc.type === activeFilter;
+        if (!matchType) return false;
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            getDocType(doc.type).toLowerCase().includes(q) ||
+            doc._id.toLowerCase().includes(q) ||
+            (doc.recipient   && String(doc.recipient).toLowerCase().includes(q)) ||
+            (doc.item_name   && String(doc.item_name).toLowerCase().includes(q)) ||
+            (doc.reason      && String(doc.reason).toLowerCase().includes(q)) ||
+            (doc.notes       && String(doc.notes).toLowerCase().includes(q)) ||
+            (doc.created_at  && new Date(doc.created_at).toLocaleString('uk-UA').toLowerCase().includes(q))
+        );
+    });
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -166,6 +179,33 @@ const Acts = () => {
                     ))}
                 </div>
 
+                {/* Search bar */}
+                <div className="px-6 py-3 border-b border-slate-100 bg-white flex items-center gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder={t('acts.search') || 'Пошук по типу, ID, отримувачу, МтаК...'}
+                            className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-slate-50"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                <XCircle size={14} />
+                            </button>
+                        )}
+                    </div>
+                    {searchQuery && (
+                        <span className="text-xs text-slate-500">
+                            Знайдено: <span className="font-semibold text-slate-700">{filteredDocs.length}</span>
+                        </span>
+                    )}
+                </div>
+
                 {loading ? (
                     <div className="p-12 text-center text-slate-400">Завантаження...</div>
                 ) : (
@@ -209,7 +249,11 @@ const Acts = () => {
                                 <FileText size={36} className="mx-auto mb-3 text-slate-200" />
                                 <p className="text-slate-400 font-medium">Документів не знайдено</p>
                                 <p className="text-slate-300 text-xs mt-1">
-                                    {activeFilter !== 'all' ? 'Спробуйте змінити фільтр' : 'Документи з\'являться після операцій у порталі працівника'}
+                                    {searchQuery
+                                        ? `Немає збігів для «${searchQuery}»`
+                                        : activeFilter !== 'all'
+                                            ? 'Спробуйте змінити фільтр'
+                                            : 'Документи з\'являться після операцій у порталі працівника'}
                                 </p>
                             </div>
                         )}
