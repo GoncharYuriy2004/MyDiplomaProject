@@ -36,7 +36,7 @@ export const ItemsProvider = ({ children }: { children: ReactNode }) => {
 
   const updateItem = async (id: string, data: Partial<Product>) => {
     const existing = items.find(i => i._id === id);
-    if (!existing) return;
+    if (!existing) throw new Error('Товар не знайдено у локальному стані. Оновіть сторінку.');
     const merged = { ...existing, ...data };
     const updated = await apiUpdateItem(id, merged);
     setItems(prev => prev.map(i => i._id === id ? (updated as Product) : i));

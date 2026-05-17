@@ -435,13 +435,19 @@ const Issuing = () => {
                                     <span>{t('issuing.request.order')}: <span className="font-mono">{shortId(selected.order_id)}</span></span>
                                     <span>{fmtDate(selected.created_at)}</span>
                                 </div>
-                                {selected.status === 'CREATED' && warehouseMatch && (
-                                    <div className={`mt-3 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${warehouseMatch.current_stock > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                                        {warehouseMatch.current_stock > 0
-                                            ? <><CheckCircle2 size={13} /> {t('issuing.request.foundInStock')}: <strong>{translateItemName(warehouseMatch.name, language)}</strong> — {warehouseMatch.current_stock} {translateUnit(warehouseMatch.unit, language)}</>
-                                            : <><AlertTriangle size={13} /> {t('issuing.request.zeroStock')}</>
-                                        }
-                                    </div>
+                                {(selected.status === 'CREATED' || selected.status === 'WAITING') && (
+                                    warehouseMatch ? (
+                                        <div className={`mt-3 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${warehouseMatch.current_stock > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                                            {warehouseMatch.current_stock > 0
+                                                ? <><CheckCircle2 size={13} /> {t('issuing.request.foundInStock')}: <strong>{translateItemName(warehouseMatch.name, language)}</strong> — {warehouseMatch.current_stock} {translateUnit(warehouseMatch.unit, language)}</>
+                                                : <><AlertTriangle size={13} /> {t('issuing.request.zeroStock')}</>
+                                            }
+                                        </div>
+                                    ) : (
+                                        <div className="mt-3 px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-slate-50 text-slate-500 border border-slate-200">
+                                            <AlertTriangle size={13} /> Товар не знайдено автоматично — оберіть зі списку вручну
+                                        </div>
+                                    )
                                 )}
                             </div>
                         ) : (
@@ -627,7 +633,7 @@ const Issuing = () => {
 
                                 {/* Buttons */}
                                 <div className="flex gap-3 pt-1">
-                                    <button type="submit" disabled={!selectedItem || busy}
+                                    <button type="submit" disabled={busy}
                                         className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-colors disabled:opacity-50 shadow-lg shadow-slate-800/20">
                                         <PackageMinus size={18} />
                                         {busy ? t('issuing.busy.issuing') : fromRequest ? t('issuing.btn.issueAndApprove') : t('issuing.btn.issue')}
