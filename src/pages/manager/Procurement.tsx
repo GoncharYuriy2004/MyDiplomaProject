@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Clock, CheckCircle2, Truck, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Clock, CheckCircle2, Truck, Trash2, Search, XCircle } from 'lucide-react';
 import { useItems } from '../../context/ItemsContext';
 import { useSuppliers } from '../../context/SupplierContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -37,6 +37,23 @@ const Procurement = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'' | 'planned' | 'ordered' | 'received'>('');
+
+    const filteredOrders = useMemo(() => {
+        return orders.filter(o => {
+            const matchStatus = !statusFilter || o.status === statusFilter;
+            if (!matchStatus) return false;
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase();
+            return (
+                o.item_name.toLowerCase().includes(q) ||
+                o.supplier_name.toLowerCase().includes(q) ||
+                (o.date && o.date.slice(0, 10).includes(q)) ||
+                String(o.total).includes(q)
+            );
+        });
+    }, [orders, searchQuery, statusFilter]);
 
     const lowStockItems = items.filter(p => p.current_stock < p.min_stock);
 
@@ -169,16 +186,58 @@ const Procurement = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* PO List */}
                 <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50">
-                        <h3 className="font-semibold text-slate-700">{t('procurement.list.title')}</h3>
+                    {/* Header */}
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-slate-700">{t('procurement.list.title')}</h3>
+                            <span className="text-xs text-slate-400">
+                                {filteredOrders.length} / {orders.length}
+                            </span>
+                        </div>
+                        {/* Search + status filter */}
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Пошук по МтаК, постачальнику, даті..."
+                                    className="w-full pl-8 pr-7 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+                                />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <XCircle size={13} />
+                                    </button>
+                                )}
+                            </div>
+                            <select
+                                value={statusFilter}
+                                onChange={e => setStatusFilter(e.target.value as any)}
+                                className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:ring-2 focus:ring-blue-400 outline-none"
+                            >
+                                <option value="">Всі статуси</option>
+                                <option value="planned">{t('procurement.status.planned')}</option>
+                                <option value="ordered">{t('procurement.status.ordered')}</option>
+                                <option value="received">{t('procurement.status.received')}</option>
+                            </select>
+                        </div>
                     </div>
+
                     {isLoading ? (
                         <div className="p-8 text-center text-slate-400 text-sm">Завантаження...</div>
-                    ) : orders.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400 text-sm">Замовлень ще немає</div>
+                    ) : filteredOrders.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-sm">
+                            {orders.length === 0
+                                ? 'Замовлень ще немає'
+                                : searchQuery
+                                    ? `Немає збігів для «${searchQuery}»`
+                                    : 'Немає замовлень з таким статусом'}
+                        </div>
                     ) : (
                         <div className="divide-y divide-slate-100">
-                            {orders.map((order) => (
+                            {filteredOrders.map((order) => (
                                 <div key={order._id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                                     <div>
                                         <p className="font-bold text-slate-800">{order.item_name}</p>
