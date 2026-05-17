@@ -12,6 +12,7 @@ const AddSupplierPage = () => {
     const isEditMode = Boolean(id);
     
     const [formData, setFormData] = useState({
+        code: '',
         name: '',
         edrpou: '',
         address: '',
@@ -29,6 +30,7 @@ const AddSupplierPage = () => {
             const supplier = suppliers.find(s => s._id === id);
             if (supplier) {
                 setFormData({
+                    code: supplier.code || '',
                     name: supplier.name,
                     edrpou: supplier.edrpou,
                     address: supplier.address || '',
@@ -48,6 +50,7 @@ const AddSupplierPage = () => {
         setIsLoading(true);
 
         const supplierData = {
+            code:           formData.code,
             name:           formData.name,
             edrpou:         formData.edrpou,
             address:        formData.address,
@@ -98,6 +101,23 @@ const AddSupplierPage = () => {
                     {/* Form Body */}
                     <form onSubmit={handleSubmit} className="p-8 space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Code */}
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <FileText size={14} className="text-blue-500" /> Код постачальника
+                                </label>
+                                <input
+                                    required
+                                    maxLength={30}
+                                    type="text"
+                                    className="w-full px-5 py-4 bg-slate-50/50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-transparent outline-none transition-all text-sm font-bold font-mono text-slate-700"
+                                    placeholder="POST-001"
+                                    value={formData.code}
+                                    onChange={(e) => setFormData({...formData, code: e.target.value})}
+                                />
+                                <p className="text-xs text-slate-400 ml-1">Унікальний внутрішній код, який ви задаєте вручну (наприклад, POST-001)</p>
+                            </div>
+
                             {/* Name */}
                             <div className="space-y-2 md:col-span-2">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">

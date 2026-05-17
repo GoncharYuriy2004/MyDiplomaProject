@@ -12,7 +12,8 @@ const Suppliers = () => {
 
     const filteredSuppliers = suppliers.filter(s =>
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.edrpou.includes(searchTerm)
+        s.edrpou.includes(searchTerm) ||
+        (s.code && s.code.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     return (
@@ -62,16 +63,16 @@ const Suppliers = () => {
                                 <tr key={supplier._id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <p className="font-bold text-slate-800">{supplier.name}</p>
-                                        <p className="text-xs text-slate-500 mt-1 font-medium italic">ID: <span className="text-slate-400">Gen by DB</span></p>
+                                        <p className="text-xs text-slate-500 mt-1 font-mono font-medium">{supplier.code || '—'}</p>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><Mail size={12} className="text-blue-500"/> {supplier.contact_info}</span>
+                                            <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><Mail size={12} className="text-blue-500"/> {supplier.email || supplier.contact_info || '—'}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold font-mono border border-blue-100">
-                                            {supplier.bank_details}
+                                            {supplier.iban || supplier.bank_details || '—'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right space-x-2">

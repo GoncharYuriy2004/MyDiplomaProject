@@ -9,6 +9,7 @@ export type User = {
 
 export type Supplier = {
     _id: string;
+    code?: string;
     name: string;
     edrpou: string;
     contact_info?: string;

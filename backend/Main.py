@@ -123,6 +123,7 @@ def user_from_db(doc: dict) -> dict:
 def supplier_to_db(data: dict) -> dict:
     """API fields → DB Ukrainian fields for Suppliers class."""
     return {
+        "Код":              data.get("code", ""),
         "Ім'я":             data.get("name", ""),
         "Адреса":           data.get("address", ""),
         "IBAN":             data.get("iban", ""),
@@ -130,7 +131,7 @@ def supplier_to_db(data: dict) -> dict:
         "Електронна пошта": data.get("email", ""),
         "Телеграма":        data.get("telegram", ""),
         "Телефон":          data.get("phone", ""),
-        "edrpou":           data.get("edrpou", ""),  # extra field not in diagram
+        "edrpou":           data.get("edrpou", ""),
     }
 
 def supplier_from_db(doc: dict) -> dict:
@@ -143,6 +144,7 @@ def supplier_from_db(doc: dict) -> dict:
     cp    = doc.get("Контактна особа") or doc.get("Контактна_особа", "")
     return {
         "_id":            str(doc["_id"]),
+        "code":           doc.get("Код", ""),
         "name":           name,
         "edrpou":         doc.get("edrpou", ""),
         "address":        doc.get("Адреса", ""),
@@ -405,6 +407,7 @@ async def deactivate_user(uid: str, _: dict = Depends(require_manager)):
 # SUPPLIERS  — Suppliers class
 # ═══════════════════════════════════════════════════════════════════════════════
 class SupplierModel(BaseModel):
+    code:           str = ""
     name:           str
     edrpou:         str = ""
     address:        str = ""
@@ -861,6 +864,21 @@ async def reject_detail_request(rid: str, body: DetailRequestStatusUpdate, _: di
         {"_id": to_oid(rid)},
         {"$set": {
             "status":      "REJECTED",
+            "approved_by": body.approved_by,
+            "approved_at": datetime.utcnow().isoformat(),
+        }},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Request not found")
+    doc = await detail_requests_col.find_one({"_id": to_oid(rid)})
+    return detail_request_from_db(doc)
+
+@app.patch("/detail-requests/{rid}/wait")
+async def wait_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
+    result = await detail_requests_col.update_one(
+        {"_id": to_oid(rid)},
+        {"$set": {
+            "status":      "WAITING",
             "approved_by": body.approved_by,
             "approved_at": datetime.utcnow().isoformat(),
         }},

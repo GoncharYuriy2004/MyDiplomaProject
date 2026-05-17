@@ -40,6 +40,12 @@ const Procurement = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'' | 'planned' | 'ordered' | 'received'>('');
 
+    // Form combobox states
+    const [itemSearch, setItemSearch] = useState('');
+    const [itemDropOpen, setItemDropOpen] = useState(false);
+    const [supplierSearch, setSupplierSearch] = useState('');
+    const [supplierDropOpen, setSupplierDropOpen] = useState(false);
+
     const filteredOrders = useMemo(() => {
         return orders.filter(o => {
             const matchStatus = !statusFilter || o.status === statusFilter;
@@ -92,8 +98,10 @@ const Procurement = () => {
             });
             setOrders(prev => [created, ...prev]);
             setSelectedItemId('');
+            setItemSearch('');
             setQuantity('1');
             setSelectedSupplierId('');
+            setSupplierSearch('');
             showMessage(t('procurement.msg.created') || 'Замовлення створено!');
         } catch (err: any) {
             showMessage(err.message ?? 'Помилка створення замовлення', true);
@@ -151,37 +159,9 @@ const Procurement = () => {
                     <h2 className="text-xl font-bold text-slate-800">{t('procurement.title')}</h2>
                     <p className="text-slate-500 text-sm mt-1">{t('procurement.subtitle')}</p>
                 </div>
-                {lowStockItems.length > 0 && (
-                    <div className="animate-pulse bg-red-50 text-red-600 px-4 py-2 rounded-lg border border-red-100 text-sm font-bold flex items-center gap-2">
-                        Low Stock Alert! ({lowStockItems.length})
-                    </div>
-                )}
             </div>
 
-            {lowStockItems.length > 0 && (
-                <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 text-orange-800">
-                        <div className="p-2 bg-orange-100 rounded-lg">
-                            <Clock className="w-5 h-5 text-orange-600" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold">Аналіз критичних залишків</p>
-                            <p className="text-xs">Виявлено {lowStockItems.length} товарів нижче норми.</p>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {lowStockItems.map(item => (
-                            <button
-                                key={item._id}
-                                onClick={() => { setSelectedItemId(item._id); setQuantity((item.min_stock * 2).toString()); }}
-                                className="px-3 py-1.5 bg-white border border-orange-200 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition-colors shadow-sm"
-                            >
-                                {t('procurement.replenish') || 'Поповнити'} {translateItemName(item.name, language)}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
+
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* PO List */}
@@ -261,22 +241,45 @@ const Procurement = () => {
                     )}
                 </div>
 
-                {/* Quick New Request Form */}
+                {/* New Purchase Order Form */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 h-fit">
                     <h3 className="font-semibold text-slate-700 mb-4 pb-4 border-b border-slate-100">{t('procurement.form.title')}</h3>
                     <form className="space-y-4">
+                        {/* Item combobox */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">{t('procurement.form.product')}</label>
-                            <select
-                                value={selectedItemId}
-                                onChange={(e) => setSelectedItemId(e.target.value)}
-                                className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                            >
-                                <option value="">{t('procurement.form.product.placeholder')}</option>
-                                {items.map(p => (
-                                    <option key={p._id} value={p._id}>{p.name} (на складі: {p.current_stock} {p.unit})</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    className="block w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder={t('procurement.form.product.placeholder')}
+                                    value={itemSearch !== '' || itemDropOpen ? itemSearch : (items.find(i => i._id === selectedItemId)?.name ?? '')}
+                                    onChange={e => { setItemSearch(e.target.value); setSelectedItemId(''); setItemDropOpen(true); }}
+                                    onFocus={() => { setItemSearch(''); setItemDropOpen(true); }}
+                                    onBlur={() => setTimeout(() => setItemDropOpen(false), 150)}
+                                />
+                                {itemDropOpen && (
+                                    <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                        {items
+                                            .filter(i => !itemSearch || i.name.toLowerCase().includes(itemSearch.toLowerCase()))
+                                            .map(i => (
+                                                <button
+                                                    key={i._id}
+                                                    type="button"
+                                                    onMouseDown={e => { e.preventDefault(); setSelectedItemId(i._id); setItemSearch(''); setItemDropOpen(false); }}
+                                                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                                >
+                                                    <span className="font-medium">{i.name}</span>
+                                                    <span className="ml-2 text-xs text-slate-400">на складі: {i.current_stock} {i.unit}</span>
+                                                </button>
+                                            ))}
+                                        {items.filter(i => !itemSearch || i.name.toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
+                                            <p className="px-3 py-2 text-xs text-slate-400">Нічого не знайдено</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">{t('procurement.form.quantity')}</label>
@@ -286,18 +289,41 @@ const Procurement = () => {
                                 className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
+                        {/* Supplier combobox */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">{t('procurement.form.supplier')}</label>
-                            <select
-                                value={selectedSupplierId}
-                                onChange={(e) => setSelectedSupplierId(e.target.value)}
-                                className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                            >
-                                <option value="">— Оберіть постачальника —</option>
-                                {suppliers.map(s => (
-                                    <option key={s._id} value={s._id}>{s.name}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    className="block w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="Оберіть постачальника..."
+                                    value={supplierSearch !== '' || supplierDropOpen ? supplierSearch : (suppliers.find(s => s._id === selectedSupplierId)?.name ?? '')}
+                                    onChange={e => { setSupplierSearch(e.target.value); setSelectedSupplierId(''); setSupplierDropOpen(true); }}
+                                    onFocus={() => { setSupplierSearch(''); setSupplierDropOpen(true); }}
+                                    onBlur={() => setTimeout(() => setSupplierDropOpen(false), 150)}
+                                />
+                                {supplierDropOpen && (
+                                    <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                        {suppliers
+                                            .filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase()))
+                                            .map(s => (
+                                                <button
+                                                    key={s._id}
+                                                    type="button"
+                                                    onMouseDown={e => { e.preventDefault(); setSelectedSupplierId(s._id); setSupplierSearch(''); setSupplierDropOpen(false); }}
+                                                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                                >
+                                                    <span className="font-medium">{s.name}</span>
+                                                    {s.code && <span className="ml-2 text-xs text-slate-400 font-mono">{s.code}</span>}
+                                                </button>
+                                            ))}
+                                        {suppliers.filter(s => !supplierSearch || s.name.toLowerCase().includes(supplierSearch.toLowerCase())).length === 0 && (
+                                            <p className="px-3 py-2 text-xs text-slate-400">Нічого не знайдено</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {successMessage && (

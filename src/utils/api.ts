@@ -122,7 +122,7 @@ export type DetailRequest = {
   detail_needs: string;
   explanation: string;
   photos: string[];
-  status: 'CREATED' | 'APPROVED' | 'REJECTED';
+  status: 'CREATED' | 'WAITING' | 'APPROVED' | 'REJECTED';
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;
@@ -140,6 +140,13 @@ export const apiApproveDetailRequest = (id: string, approved_by: string) =>
 
 export const apiRejectDetailRequest = (id: string, approved_by: string) =>
   request<DetailRequest>(`/detail-requests/${id}/reject`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ approved_by }),
+  });
+
+export const apiWaitDetailRequest = (id: string, approved_by: string) =>
+  request<DetailRequest>(`/detail-requests/${id}/wait`, {
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify({ approved_by }),
