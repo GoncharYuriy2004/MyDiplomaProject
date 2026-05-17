@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { type Document } from '../data/mockData';
-import { apiGetDocuments, apiCreateDocument, apiApproveDocument, apiRejectDocument } from '../utils/api';
+import { apiGetDocuments, apiCreateDocument, apiApproveDocument, apiRejectDocument, apiDeleteDocument } from '../utils/api';
 
 interface DocumentsContextType {
   documents:       Document[];
@@ -10,6 +10,7 @@ interface DocumentsContextType {
   createDocument:  (data: Omit<Document, '_id'>) => Promise<void>;
   approveDocument: (id: string) => Promise<void>;
   removeDocument:  (id: string) => Promise<void>;
+  deleteDocument:  (id: string) => Promise<void>;
 }
 
 const DocumentsContext = createContext<DocumentsContextType | undefined>(undefined);
@@ -60,8 +61,13 @@ export const DocumentsProvider = ({ children }: { children: ReactNode }) => {
     setDocuments(prev => prev.map(d => d._id === id ? { ...d, status: 'rejected' as const } : d));
   };
 
+  const deleteDocument = async (id: string) => {
+    await apiDeleteDocument(id);
+    setDocuments(prev => prev.filter(d => d._id !== id));
+  };
+
   return (
-    <DocumentsContext.Provider value={{ documents, loading, error, refetch: fetch, createDocument, approveDocument, removeDocument }}>
+    <DocumentsContext.Provider value={{ documents, loading, error, refetch: fetch, createDocument, approveDocument, removeDocument, deleteDocument }}>
       {children}
     </DocumentsContext.Provider>
   );

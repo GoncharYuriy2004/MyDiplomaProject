@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileDown, FileText, CheckCircle2, Clock, XCircle, Package, AlertTriangle, ClipboardList, RefreshCw, Search } from 'lucide-react';
+import { FileDown, FileText, CheckCircle2, Clock, XCircle, Package, AlertTriangle, ClipboardList, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { downloadInvoicePDF } from '../../utils/pdfGenerator';
 import { useLanguage } from '../../context/LanguageContext';
 import { useDocuments } from '../../context/DocumentsContext';
@@ -16,10 +16,17 @@ const FILTERS: { key: FilterType; labelKey: string }[] = [
 
 const Acts = () => {
     const { t } = useLanguage();
-    const { documents, loading, refetch } = useDocuments();
+    const { documents, loading, refetch, deleteDocument } = useDocuments();
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [refreshing, setRefreshing] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Видалити документ? Дію неможливо скасувати.')) return;
+        setDeletingId(id);
+        try { await deleteDocument(id); } finally { setDeletingId(null); }
+    };
 
     const handleRefresh = async () => {
         setRefreshing(true);
@@ -235,13 +242,23 @@ const Acts = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => downloadInvoicePDF(doc)}
-                                    className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all shrink-0"
-                                >
-                                    <FileDown size={15} className="text-slate-400" />
-                                    {t('acts.btn.download')}
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        onClick={() => downloadInvoicePDF(doc)}
+                                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all"
+                                    >
+                                        <FileDown size={15} className="text-slate-400" />
+                                        {t('acts.btn.download')}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(doc._id)}
+                                        disabled={deletingId === doc._id}
+                                        className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all disabled:opacity-50"
+                                        title="Видалити документ"
+                                    >
+                                        <Trash2 size={15} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                         {filteredDocs.length === 0 && (
