@@ -843,16 +843,26 @@ async def list_detail_requests(_: dict = Depends(get_current_user)):
     docs = await detail_requests_col.find().sort("created_at", -1).to_list(length=None)
     return [detail_request_from_db(d) for d in docs]
 
-async def _update_detail_request_status(rid: str, fields: dict) -> dict:
-    """Update a detail-request status, handling both ObjectId and string _id (C# compat)."""
+async def _find_detail_request_doc(rid: str):
+    """Find a detail request by _id, trying all possible BSON types (C# compat)."""
     oid = safe_to_oid(rid)
-    # Try ObjectId first, fall back to raw string (C# may store _id as string)
-    for id_val in ([oid, rid] if oid != rid else [rid]):
-        result = await detail_requests_col.update_one({"_id": id_val}, {"$set": fields})
-        if result.matched_count > 0:
-            doc = await detail_requests_col.find_one({"_id": id_val})
-            return detail_request_from_db(doc)
-    raise HTTPException(status_code=404, detail="Request not found")
+    candidates = [oid, rid] if oid != rid else [rid]
+    try:
+        candidates.append(int(rid))
+    except (ValueError, TypeError):
+        pass
+    doc = await detail_requests_col.find_one({"_id": {"$in": candidates}})
+    return doc
+
+async def _update_detail_request_status(rid: str, fields: dict) -> dict:
+    """Update a detail-request status, handling any _id type (ObjectId, string, int)."""
+    doc = await _find_detail_request_doc(rid)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Request not found")
+    actual_id = doc["_id"]
+    await detail_requests_col.update_one({"_id": actual_id}, {"$set": fields})
+    updated = await detail_requests_col.find_one({"_id": actual_id})
+    return detail_request_from_db(updated)
 
 @app.patch("/detail-requests/{rid}/approve")
 async def approve_detail_request(rid: str, body: DetailRequestStatusUpdate, _: dict = Depends(get_current_user)):
