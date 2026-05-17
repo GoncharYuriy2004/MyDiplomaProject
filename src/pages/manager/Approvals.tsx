@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Check, X, AlertCircle, CheckCircle2, ClipboardList, Package, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, X, AlertCircle, CheckCircle2, ClipboardList, AlertTriangle, UserCheck, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDocuments } from '../../context/DocumentsContext';
+import { apiGetUsers, apiActivateUser } from '../../utils/api';
 
 const APPROVAL_CRITERIA: { id: string; label: string; hint: string }[] = [
     {
@@ -35,6 +36,29 @@ const Approvals = () => {
     const [approvingDoc, setApprovingDoc] = useState<any | null>(null);
     const [checkedCriteria, setCheckedCriteria] = useState<Record<string, boolean>>({});
     const [busy, setBusy] = useState(false);
+
+    // ── Pending user registrations ────────────────────────────────────────
+    const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+    const [usersLoading, setUsersLoading] = useState(true);
+
+    const loadPendingUsers = () => {
+        setUsersLoading(true);
+        apiGetUsers()
+            .then((all: any[]) => setPendingUsers(all.filter(u => u.account_status === 'REGISTRATION')))
+            .catch(() => {})
+            .finally(() => setUsersLoading(false));
+    };
+
+    useEffect(() => { loadPendingUsers(); }, []);
+
+    const handleActivateUser = async (uid: string) => {
+        setBusy(true);
+        try {
+            await apiActivateUser(uid);
+            setPendingUsers(prev => prev.filter(u => u._id !== uid));
+        } catch { /* ignore */ }
+        finally { setBusy(false); }
+    };
 
     const pendingDocs = documents.filter(
         (doc) => doc.status === 'pending' && (doc.type === 'act_writeoff' || doc.type === 'discrepancy_act')
@@ -221,6 +245,46 @@ const Approvals = () => {
                                 {busy ? 'Збереження...' : 'Затвердити документ'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Pending user activations ── */}
+            {(usersLoading || pendingUsers.length > 0) && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <UserCheck size={18} className="text-violet-600" />
+                            <h3 className="font-bold text-slate-800">Активація нових акаунтів</h3>
+                            {pendingUsers.length > 0 && (
+                                <span className="bg-violet-100 text-violet-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                                    {pendingUsers.length}
+                                </span>
+                            )}
+                        </div>
+                        <button onClick={loadPendingUsers} disabled={usersLoading}
+                            className="text-slate-400 hover:text-slate-600 disabled:opacity-50">
+                            <RefreshCw size={15} className={usersLoading ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                        {usersLoading ? (
+                            <div className="p-6 text-center text-slate-400 text-sm">Завантаження...</div>
+                        ) : pendingUsers.map(u => (
+                            <div key={u._id} className="px-6 py-4 flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="font-medium text-slate-800">{u.full_name || u.login}</p>
+                                    <p className="text-xs text-slate-400 font-mono">{u.login} · {u.role_in_system === 'WAREHOUSE_WORKER' ? 'Працівник складу' : u.role_in_system}</p>
+                                    {u.position && <p className="text-xs text-slate-400">{u.position}</p>}
+                                </div>
+                                <button
+                                    disabled={busy}
+                                    onClick={() => handleActivateUser(u._id)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50 shrink-0">
+                                    <Check size={14} /> Активувати
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

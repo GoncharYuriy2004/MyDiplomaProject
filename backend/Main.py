@@ -8,6 +8,7 @@ from bson import ObjectId
 from datetime import datetime
 
 from dotenv import load_dotenv
+import pathlib
 from auth_utils import (
     get_password_hash,
     verify_password,
@@ -19,7 +20,7 @@ import motor.motor_asyncio
 import httpx
 import os
 
-load_dotenv()
+load_dotenv(pathlib.Path(__file__).parent / ".env")
 
 app = FastAPI(title="IT-WMS API", version="1.0.0")
 
@@ -284,43 +285,30 @@ async def register(user: UserRegister):
     if user.role_in_system not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"role_in_system must be one of {_VALID_ROLES}")
 
-    # Delegate registration to C# server (shared DiplomDB)
-    try:
-        async with httpx.AsyncClient(timeout=10) as client_http:
-            cs_resp = await client_http.post(f"{CS_API}/api/auth/register", json={
-                "login":          user.login,
-                "password":       user.password,
-                "fullName":       user.full_name,
-                "roleInSystem":   user.role_in_system,
-                "passNumber":     user.pass_number,
-                "position":       user.position or "",
-                "phone":          user.phone or "",
-                "email":          user.email or "",
-                "workshopNumber": user.workshop_number or 0,
-                "floorNumber":    user.floor_number or 0,
-                "officeNumber":   user.office_number or 0,
-            })
-        cs_data = cs_resp.json()
-        if cs_resp.status_code not in (200, 201):
-            raise HTTPException(status_code=400, detail=cs_data.get("message", "Registration failed"))
-        # Find the newly created user to return its id
-        new_user = await users_col.find_one({"login": user.login})
-        return {"message": "Account created. Waiting for manager activation.", "id": str(new_user["_id"]) if new_user else ""}
-    except httpx.RequestError:
-        # C# server unavailable — fallback: save directly to DiplomDB
-        if await users_col.find_one({"login": user.login}):
-            raise HTTPException(status_code=400, detail="Login already taken")
-        doc = {
-            "full_name": user.full_name, "pass_number": user.pass_number,
-            "role_in_system": user.role_in_system, "login": user.login,
-            "password_hash": get_password_hash(user.password),
-            "position": user.position, "phone": user.phone, "email": user.email,
-            "account_status": "REGISTRATION",
-            "floor_number": user.floor_number, "office_number": user.office_number,
-            "workshop_number": user.workshop_number, "created_at": datetime.utcnow(),
-        }
-        result = await users_col.insert_one(doc)
-        return {"message": "Account created. Waiting for manager activation.", "id": str(result.inserted_id)}
+    if await users_col.find_one({"login": user.login}):
+        raise HTTPException(status_code=400, detail="Login already taken")
+
+    # Managers activate immediately; workers need manager approval
+    status = "ACTIVE" if user.role_in_system == "WAREHOUSE_MANAGER" else "REGISTRATION"
+
+    doc = {
+        "full_name":       user.full_name,
+        "pass_number":     user.pass_number,
+        "role_in_system":  user.role_in_system,
+        "login":           user.login,
+        "password_hash":   get_password_hash(user.password),
+        "position":        user.position,
+        "phone":           user.phone,
+        "email":           user.email,
+        "account_status":  status,
+        "floor_number":    user.floor_number,
+        "office_number":   user.office_number,
+        "workshop_number": user.workshop_number,
+        "created_at":      datetime.utcnow(),
+    }
+    result = await users_col.insert_one(doc)
+    msg = "Account created successfully." if status == "ACTIVE" else "Account created. Waiting for manager activation."
+    return {"message": msg, "id": str(result.inserted_id)}
 
 @app.post("/auth/login")
 async def login(creds: UserLogin):
