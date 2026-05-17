@@ -10,6 +10,7 @@ import { useItems } from '../../context/ItemsContext';
 import {
     apiCreateTransaction, apiCreateDocument, apiGetDocuments,
     apiGetDetailRequests, apiApproveDetailRequest, apiRejectDetailRequest,
+    apiWaitDetailRequest,
     apiGetUsers,
     type DetailRequest,
 } from '../../utils/api';
@@ -222,8 +223,8 @@ const Issuing = () => {
 
             await refetch();
 
-            // If issuing from a request — approve it
-            if (selected && selected.status === 'CREATED') {
+            // If issuing from a request — approve it (CREATED or WAITING)
+            if (selected && (selected.status === 'CREATED' || selected.status === 'WAITING')) {
                 const updated = await apiApproveDetailRequest(selected._id, user?.full_name ?? 'Працівник');
                 setRequests(prev => prev.map(r => r._id === updated._id ? updated : r));
                 setSelected(updated);
@@ -281,8 +282,6 @@ const Issuing = () => {
         if (!selected) return;
         setBusy(true);
         try {
-            // Add apiWaitDetailRequest to utils/api if missing
-            const { apiWaitDetailRequest } = await import('../../utils/api');
             const updated = await apiWaitDetailRequest(selected._id, user?.full_name ?? 'Працівник');
             setRequests(prev => prev.map(r => r._id === updated._id ? updated : r));
             setSelected(updated);
@@ -362,7 +361,7 @@ const Issuing = () => {
                             <Wrench size={12} /> {t('issuing.col.requests')}
                         </p>
                         {/* Tabs */}
-                        <div className="flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                        <div className="flex flex-wrap gap-0.5 bg-slate-100 rounded-lg p-0.5">
                             {(['CREATED','WAITING','ALL','APPROVED','REJECTED'] as TabFilter[]).map(k => (
                                 <button key={k} onClick={() => setTab(k)}
                                     className={`flex-1 text-[10px] font-bold py-1 rounded-md transition-all ${tab === k ? 'bg-white shadow text-violet-700' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -633,21 +632,20 @@ const Issuing = () => {
                                         {busy ? t('issuing.busy.issuing') : fromRequest ? t('issuing.btn.issueAndApprove') : t('issuing.btn.issue')}
                                     </button>
 
-
-
                                     {fromRequest && selected?.status === 'CREATED' && (
-                                        <>
-                                            <button type="button" onClick={handleWait} disabled={busy}
-                                                className="flex items-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50">
-                                                <Clock size={16} />
-                                                {t('issuing.btn.wait')}
-                                            </button>
-                                            <button type="button" onClick={handleReject} disabled={busy}
-                                                className="flex items-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50">
-                                                <XCircle size={16} />
-                                                {t('issuing.btn.reject')}
-                                            </button>
-                                        </>
+                                        <button type="button" onClick={handleWait} disabled={busy}
+                                            className="flex items-center gap-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50">
+                                            <Clock size={16} />
+                                            {t('issuing.btn.wait')}
+                                        </button>
+                                    )}
+
+                                    {fromRequest && (selected?.status === 'CREATED' || selected?.status === 'WAITING') && (
+                                        <button type="button" onClick={handleReject} disabled={busy}
+                                            className="flex items-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50">
+                                            <XCircle size={16} />
+                                            {t('issuing.btn.reject')}
+                                        </button>
                                     )}
                                 </div>
                             </form>

@@ -168,7 +168,7 @@ export const en = {
     'issuing.btn.refresh': 'Refresh requests',
     'issuing.col.requests': 'Incoming requests',
     'issuing.tab.new': 'New',
-    'issuing.tab.waiting': 'Wait',
+    'issuing.tab.waiting': 'Waiting',
     'issuing.tab.all': 'All',
     'issuing.tab.approved': 'Appr.',
     'issuing.tab.rejected': 'Rej.',
@@ -216,6 +216,7 @@ export const en = {
     'issuing.msg.issuedFromRequest': '✓ Issued {{qty}} × {{name}}. Request approved.',
     'issuing.msg.approvedOnly': 'Request approved without issuing.',
     'issuing.msg.rejected': 'Request rejected.',
+    'issuing.msg.waiting': 'Request moved to Waiting status.',
     'issuing.busy.issuing': 'Processing...',
 
     // Inventory Check Page

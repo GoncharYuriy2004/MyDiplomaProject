@@ -168,7 +168,7 @@ export const uk = {
     'issuing.btn.refresh': 'Оновити запити',
     'issuing.col.requests': 'Вхідні запити',
     'issuing.tab.new': 'Нові',
-    'issuing.tab.waiting': 'Очік.',
+    'issuing.tab.waiting': 'Очікування',
     'issuing.tab.all': 'Всі',
     'issuing.tab.approved': 'Схвал.',
     'issuing.tab.rejected': 'Відхил.',
@@ -216,6 +216,7 @@ export const uk = {
     'issuing.msg.issuedFromRequest': '✓ Видано {{qty}} × {{name}}. Запит схвалено.',
     'issuing.msg.approvedOnly': 'Запит схвалено без видачі.',
     'issuing.msg.rejected': 'Запит відхилено.',
+    'issuing.msg.waiting': 'Запит переведено в статус Очікування.',
     'issuing.busy.issuing': 'Виконується...',
 
     // Inventory Check Page
