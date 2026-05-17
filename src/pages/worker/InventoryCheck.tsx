@@ -27,37 +27,41 @@ const InventoryCheck = () => {
     };
 
     const handleGenerateAct = async () => {
-        const discrepancies = items
-            .filter(p => {
-                const act = actualStock[p._id];
-                return act !== undefined && act !== p.current_stock;
-            })
+        // Include ALL counted items: surplus (+), deficit (-), and exact match (0)
+        const checked = items
+            .filter(p => actualStock[p._id] !== undefined)
             .map(p => ({
-                item_id: p._id,
+                item_id:   p._id,
                 item_name: p.name,
-                sku: p.sku,
-                expected: p.current_stock,
-                actual: actualStock[p._id],
-                diff: actualStock[p._id] - p.current_stock,
+                sku:       p.sku,
+                expected:  p.current_stock,
+                actual:    actualStock[p._id],
+                diff:      actualStock[p._id] - p.current_stock,
             }));
 
-        if (discrepancies.length === 0) {
-            setSuccessMessage('Розбіжностей не знайдено. Залишки відповідають обліку.');
+        if (checked.length === 0) {
+            setSuccessMessage('Введіть фактичну кількість хоча б для одного МтаК.');
             setTimeout(() => setSuccessMessage(''), 4000);
             return;
         }
 
+        const discrepancyCount = checked.filter(d => d.diff !== 0).length;
+
         setIsSubmitting(true);
         try {
             await apiCreateDocument({
-                type: 'discrepancy_act',
-                status: 'pending',
-                created_at: new Date().toISOString(),
-                created_by: user?._id || '',
-                discrepancies,
+                type:         'discrepancy_act',
+                status:       'pending',
+                created_at:   new Date().toISOString(),
+                created_by:   user?._id || '',
+                discrepancies: checked,
             });
 
-            setSuccessMessage(`Акт розбіжностей по ${discrepancies.length} позиціях сформовано та надіслано на підтвердження.`);
+            if (discrepancyCount === 0) {
+                setSuccessMessage(`Акт інвентаризації по ${checked.length} позиціях сформовано. Розбіжностей не виявлено — всі залишки відповідають обліку.`);
+            } else {
+                setSuccessMessage(`Акт інвентаризації по ${checked.length} позиціях сформовано. Розбіжностей: ${discrepancyCount}. Надіслано на підтвердження.`);
+            }
             setTimeout(() => setSuccessMessage(''), 6000);
             setActualStock({});
         } catch (err: any) {

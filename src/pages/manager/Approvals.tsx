@@ -131,8 +131,18 @@ const Approvals = () => {
 
     const getDocDetails = (doc: any) => {
         if (doc.type === 'discrepancy_act') {
-            const count = Array.isArray(doc.discrepancies) ? doc.discrepancies.length : 0;
-            return `Виявлено розбіжностей: ${count} позиц.`;
+            const all  = Array.isArray(doc.discrepancies) ? doc.discrepancies : [];
+            const diffs = all.filter((d: any) => d.diff !== 0);
+            const surp  = diffs.filter((d: any) => d.diff > 0).length;
+            const lack  = diffs.filter((d: any) => d.diff < 0).length;
+            const ok    = all.length - diffs.length;
+            const parts = [
+                `Перевірено: ${all.length} позиц.`,
+                lack  > 0 ? `Нестача: ${lack}`    : '',
+                surp  > 0 ? `Надлишок: ${surp}`   : '',
+                ok    > 0 ? `В нормі: ${ok}`       : '',
+            ].filter(Boolean);
+            return parts.join(' · ');
         }
         return [
             doc.item_name && `📦 ${doc.item_name}`,
