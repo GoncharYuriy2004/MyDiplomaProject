@@ -130,7 +130,7 @@ const Issuing = () => {
         setRecipientSearch('');
         setNotes(selected.explanation || '');
         setMsg(null);
-    }, [selected?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [selected?._id, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const clearRequest = () => {
         setSelected(null);
@@ -177,7 +177,8 @@ const Issuing = () => {
     // ── Submit: issue (+ optionally approve request) ─────────────────────────
     const handleIssue = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        if (!itemData) return;
+        if (!selectedItem) { showMsg('Оберіть товар зі списку', false); return; }
+        if (!itemData)     { showMsg('Товар не знайдено. Оновіть сторінку та спробуйте знову.', false); return; }
         const qty = parseInt(quantity);
         if (!qty || qty < 1) { showMsg(t('issuing.err.invalidQty'), false); return; }
         if (qty > inStock)   { showMsg(t('issuing.err.notEnough').replace('{{count}}', String(inStock)), false); return; }
