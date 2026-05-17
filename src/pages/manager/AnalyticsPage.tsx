@@ -156,12 +156,14 @@ export default function AnalyticsPage() {
   const [w3, setW3] = useState('0.25');
   const [poisItemId, setPoisItemId] = useState('');
 
-  // Search state
-  const [optSearch,  setOptSearch]  = useState('');
-  const [poisSearch, setPoisSearch] = useState('');
-  const [abcSearch,  setAbcSearch]  = useState('');
-  const [xyzSearch,  setXyzSearch]  = useState('');
-  const [ciSearch,   setCiSearch]   = useState('');
+  // Search / combobox state
+  const [optSearch,    setOptSearch]    = useState('');
+  const [optDropOpen,  setOptDropOpen]  = useState(false);
+  const [poisSearch,   setPoisSearch]   = useState('');
+  const [poisDropOpen, setPoisDropOpen] = useState(false);
+  const [abcSearch,    setAbcSearch]    = useState('');
+  const [xyzSearch,    setXyzSearch]    = useState('');
+  const [ciSearch,     setCiSearch]     = useState('');
 
   // ─── Aggregate: monthly demand (out + write_off) ─────────────────────────
   const realMonthly = useMemo(() => {
@@ -414,23 +416,48 @@ export default function AnalyticsPage() {
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
             <p className="text-xs font-semibold text-blue-800">{t('analytics.opt.autoFill.label')}</p>
             <div className="relative">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" value={optSearch} onChange={e => setOptSearch(e.target.value)}
-                placeholder="Пошук МтаК..."
-                className="w-full pl-8 pr-7 py-1.5 text-sm border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              {optSearch && <button onClick={() => setOptSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><XCircle size={13} /></button>}
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={optSearch !== '' || optDropOpen ? optSearch : (items.find(i => i._id === optItemId)?.name ?? '')}
+                onChange={e => { setOptSearch(e.target.value); setOptItemId(''); setOptDropOpen(true); }}
+                onFocus={() => { setOptSearch(''); setOptDropOpen(true); }}
+                onBlur={() => setTimeout(() => setOptDropOpen(false), 150)}
+                placeholder={t('analytics.opt.autoFill.manual')}
+                className="w-full pl-8 pr-8 py-2 text-sm border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {(optItemId || optSearch) && (
+                <button
+                  onMouseDown={e => { e.preventDefault(); setOptItemId(''); setOptSearch(''); setOptDropOpen(false); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                ><XCircle size={14} /></button>
+              )}
+              {optDropOpen && (
+                <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-blue-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
+                  {items
+                    .filter(item => !optSearch.trim() ||
+                      item.name.toLowerCase().includes(optSearch.toLowerCase()) ||
+                      item.sku.toLowerCase().includes(optSearch.toLowerCase()))
+                    .map(item => (
+                      <button
+                        key={item._id}
+                        onMouseDown={e => { e.preventDefault(); setOptItemId(item._id); setOptSearch(''); setOptDropOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex flex-col gap-0.5 ${optItemId === item._id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700'}`}
+                      >
+                        <span>{item.name}</span>
+                        <span className="text-[11px] text-gray-400 font-mono">
+                          {item.sku} · {t('analytics.opt.issued')} {Math.round(itemDemandMap[item._id] ?? 0)} {language === 'en' ? 'units' : 'од.'}
+                        </span>
+                      </button>
+                    ))}
+                  {items.filter(item => !optSearch.trim() ||
+                    item.name.toLowerCase().includes(optSearch.toLowerCase()) ||
+                    item.sku.toLowerCase().includes(optSearch.toLowerCase())).length === 0 && (
+                    <p className="px-3 py-2 text-sm text-gray-400">Нічого не знайдено</p>
+                  )}
+                </div>
+              )}
             </div>
-            <select value={optItemId} onChange={e => setOptItemId(e.target.value)}
-              className="w-full border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">{t('analytics.opt.autoFill.manual')}</option>
-              {items
-                .filter(item => !optSearch.trim() || item.name.toLowerCase().includes(optSearch.toLowerCase()) || item.sku.toLowerCase().includes(optSearch.toLowerCase()))
-                .map(item => (
-                <option key={item._id} value={item._id}>
-                  {item.name} ({item.sku}) — {t('analytics.opt.issued')} {Math.round(itemDemandMap[item._id] ?? 0)} {language === 'en' ? 'units' : 'од.'}
-                </option>
-              ))}
-            </select>
             {optItemId && (
               <p className="text-xs text-blue-700">
                 D = <strong>{Math.round(itemDemandMap[optItemId] ?? 0)} {language === 'en' ? 'units' : 'од.'}</strong> ·
@@ -746,28 +773,53 @@ export default function AnalyticsPage() {
                 <p className="text-xs font-mono text-gray-400">P(X=k) = λᵏ·e⁻λ / k!</p>
               </div>
             </div>
-            <div className="mb-4 space-y-2">
-              <label className="block text-xs font-medium text-gray-500">
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">
                 {t('analytics.risk.poisson.selectLabel')}
               </label>
               <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input type="text" value={poisSearch} onChange={e => setPoisSearch(e.target.value)}
-                  placeholder="Пошук МтаК..."
-                  className="w-full pl-8 pr-7 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {poisSearch && <button onClick={() => setPoisSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><XCircle size={13} /></button>}
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={poisSearch !== '' || poisDropOpen ? poisSearch : (items.find(i => i._id === poisItemId)?.name ?? '')}
+                  onChange={e => { setPoisSearch(e.target.value); setPoisItemId(''); setPoisDropOpen(true); }}
+                  onFocus={() => { setPoisSearch(''); setPoisDropOpen(true); }}
+                  onBlur={() => setTimeout(() => setPoisDropOpen(false), 150)}
+                  placeholder={t('analytics.risk.poisson.allItems')}
+                  className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {(poisItemId || poisSearch) && (
+                  <button
+                    onMouseDown={e => { e.preventDefault(); setPoisItemId(''); setPoisSearch(''); setPoisDropOpen(false); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  ><XCircle size={14} /></button>
+                )}
+                {poisDropOpen && (
+                  <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
+                    {items
+                      .filter(i => i.status === 'available' && (!poisSearch.trim() ||
+                        i.name.toLowerCase().includes(poisSearch.toLowerCase()) ||
+                        i.sku.toLowerCase().includes(poisSearch.toLowerCase())))
+                      .map(item => (
+                        <button
+                          key={item._id}
+                          onMouseDown={e => { e.preventDefault(); setPoisItemId(item._id); setPoisSearch(''); setPoisDropOpen(false); }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors flex flex-col gap-0.5 ${poisItemId === item._id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700'}`}
+                        >
+                          <span>{item.name}</span>
+                          <span className="text-[11px] text-gray-400 font-mono">
+                            {item.sku} · {t('analytics.risk.poisson.stock')} {item.current_stock} {item.unit} · {t('analytics.risk.poisson.issued')} {Math.round(itemDemandMap[item._id] ?? 0)} {language === 'en' ? 'units' : 'од.'}
+                          </span>
+                        </button>
+                      ))}
+                    {items.filter(i => i.status === 'available' && (!poisSearch.trim() ||
+                      i.name.toLowerCase().includes(poisSearch.toLowerCase()) ||
+                      i.sku.toLowerCase().includes(poisSearch.toLowerCase()))).length === 0 && (
+                      <p className="px-3 py-2 text-sm text-gray-400">Нічого не знайдено</p>
+                    )}
+                  </div>
+                )}
               </div>
-              <select value={poisItemId} onChange={e => setPoisItemId(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">{t('analytics.risk.poisson.allItems')}</option>
-                {items
-                  .filter(i => i.status === 'available' && (!poisSearch.trim() || i.name.toLowerCase().includes(poisSearch.toLowerCase()) || i.sku.toLowerCase().includes(poisSearch.toLowerCase())))
-                  .map(item => (
-                  <option key={item._id} value={item._id}>
-                    {item.name} — {t('analytics.risk.poisson.stock')} {item.current_stock} {item.unit} · {t('analytics.risk.poisson.issued')} {Math.round(itemDemandMap[item._id] ?? 0)} {language === 'en' ? 'units' : 'од.'}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <Inp label={t('analytics.risk.poisson.lambda')} value={lam} onChange={setLam} step="0.5" />
