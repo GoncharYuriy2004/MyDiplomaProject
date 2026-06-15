@@ -395,7 +395,7 @@ export const downloadInvoicePDF = (doc: Document) => {
         }));
         // If no discrepancies stored, generate a placeholder row
         if (rows.length === 0) {
-            rows.push({ sku: '—', name: 'Дані відсутні', discrepancy: 0, type: '—', loggedBy: '—' });
+            rows.push({ sku: '—', name: 'Дані відсутні', discrepancy: 0, unitPrice: undefined, type: '—', loggedBy: '—' });
         }
         return downloadDiscrepancyActPDF(rows);
     }
