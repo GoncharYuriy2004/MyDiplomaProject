@@ -391,7 +391,7 @@ export const downloadInvoicePDF = (doc: Document) => {
             discrepancy: Number(r.diff ?? 0),
             unitPrice:   r.unit_price != null ? Number(r.unit_price) : undefined,
             type:        Number(r.diff ?? 0) === 0 ? 'Норма' : (Number(r.diff ?? 0) > 0 ? 'Надлишок' : 'Нестача'),
-            loggedBy:    String((doc as any).created_by ?? '—'),
+            loggedBy:    String((doc as any).created_by_name || (doc as any).created_by || '—'),
         }));
         // If no discrepancies stored, generate a placeholder row
         if (rows.length === 0) {

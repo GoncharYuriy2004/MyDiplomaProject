@@ -52,11 +52,12 @@ const InventoryCheck = () => {
         setIsSubmitting(true);
         try {
             await apiCreateDocument({
-                type:         'discrepancy_act',
-                status:       'pending',
-                created_at:   new Date().toISOString(),
-                created_by:   user?._id || '',
-                discrepancies: checked,
+                type:              'discrepancy_act',
+                status:            'pending',
+                created_at:        new Date().toISOString(),
+                created_by:        user?._id || '',
+                created_by_name:   user?.full_name || '',
+                discrepancies:     checked,
             });
 
             const pdfRows = checked.map(c => ({
