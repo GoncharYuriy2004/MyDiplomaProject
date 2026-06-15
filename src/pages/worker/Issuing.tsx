@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     PackageMinus, UserCheck, ClipboardPenLine, FileText,
     Search, CheckCircle2, XCircle, RefreshCw, Wrench,
-    Hash, AlertTriangle, ChevronRight, FileDown, Clock,
+    AlertTriangle, ChevronRight, FileDown, Clock,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -262,21 +262,7 @@ const Issuing = () => {
         }
     };
 
-    // ── Approve without issuing ───────────────────────────────────────────────
-    const handleApproveOnly = async () => {
-        if (!selected) return;
-        setBusy(true);
-        try {
-            const updated = await apiApproveDetailRequest(selected._id, user?.full_name ?? 'Працівник');
-            setRequests(prev => prev.map(r => r._id === updated._id ? updated : r));
-            setSelected(updated);
-            showMsg(t('issuing.msg.approvedOnly'), true);
-        } catch (err: any) {
-            showMsg(err.message ?? 'Помилка', false);
-        } finally {
-            setBusy(false);
-        }
-    };
+
 
     // ── Wait request ────────────────────────────────────────────────────────
     const handleWait = async () => {

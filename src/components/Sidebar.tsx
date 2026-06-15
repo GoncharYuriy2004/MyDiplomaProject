@@ -15,7 +15,6 @@ import {
     Ban,
     Undo2,
     BrainCircuit,
-    Wrench,
 } from 'lucide-react';
 
 const Sidebar = () => {

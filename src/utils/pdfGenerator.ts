@@ -389,7 +389,8 @@ export const downloadInvoicePDF = (doc: Document) => {
             sku:         r.sku ?? '—',
             name:        r.item_name ?? '—',
             discrepancy: Number(r.diff ?? 0),
-            type:        Number(r.diff ?? 0) > 0 ? 'Надлишок' : 'Нестача',
+            unitPrice:   r.unit_price != null ? Number(r.unit_price) : undefined,
+            type:        Number(r.diff ?? 0) === 0 ? 'Норма' : (Number(r.diff ?? 0) > 0 ? 'Надлишок' : 'Нестача'),
             loggedBy:    String((doc as any).created_by ?? '—'),
         }));
         // If no discrepancies stored, generate a placeholder row
@@ -473,7 +474,7 @@ export const downloadInvoicePDF = (doc: Document) => {
 // 5. АКТ ІНВЕНТАРИЗАЦІЇ
 // ══════════════════════════════════════════════════════════════════════════════
 export const downloadDiscrepancyActPDF = (
-    rows: Array<{ sku: string; name: string; discrepancy: number; type: string; loggedBy: string }>
+    rows: Array<{ sku: string; name: string; discrepancy: number; type: string; loggedBy: string; unitPrice?: number }>
 ) => {
     const pdf = new jsPDF();
     addCustomFonts(pdf);
@@ -509,11 +510,12 @@ export const downloadDiscrepancyActPDF = (
 
     autoTable(pdf, {
         startY: y,
-        head: [['№\nп/п', 'Найменування', 'Артикул\n(SKU)', 'Відхилення\n(+/−)', 'Тип\nрозбіжності', 'Відповідальний']],
+        head: [['№\nп/п', 'Найменування', 'Артикул\n(SKU)', 'Ціна за\nод., грн', 'Відхилення\n(+/−)', 'Тип\nрозбіжності', 'Відповідальний']],
         body: rows.map((r, i) => [
             i + 1,
             r.name,
             r.sku || '—',
+            r.unitPrice != null ? fmtMoney(r.unitPrice) : '—',
             r.discrepancy > 0 ? `+${r.discrepancy}` : String(r.discrepancy),
             r.type || '—',
             r.loggedBy || '—',
@@ -524,12 +526,16 @@ export const downloadDiscrepancyActPDF = (
         bodyStyles: { fillColor: [255,255,255] },
         columnStyles: {
             0: { cellWidth: 10, halign: 'center' },
-            2: { cellWidth: 26, halign: 'center' },
-            3: { cellWidth: 22, halign: 'center' },
+            2: { cellWidth: 24, halign: 'center' },
+            3: { cellWidth: 22, halign: 'right' },
+            4: { cellWidth: 22, halign: 'center' },
+            5: { cellWidth: 24, halign: 'center' },
+            6: { cellWidth: 35, halign: 'center' },
         },
         didParseCell: (data: any) => {
-            if (data.column.index === 3 && data.section === 'body') {
-                const v = Number(data.cell.raw);
+            if (data.column.index === 4 && data.section === 'body') {
+                const r = rows[data.row.index];
+                const v = r ? r.discrepancy : 0;
                 data.cell.styles.textColor = v < 0 ? [180, 0, 0] : v > 0 ? [0, 120, 0] : [0, 0, 0];
                 data.cell.styles.fontStyle = 'bold';
             }
@@ -794,7 +800,7 @@ export const downloadAnalyticsGuidePDF = (sections: any[]) => {
         },
         margin: { left: ML, right: MR },
     });
-    y = (pdf as any).lastAutoTable?.finalY + 4 ?? y + 60;
+    y = (pdf as any).lastAutoTable?.finalY ? (pdf as any).lastAutoTable.finalY + 4 : y + 60;
     footer();
 
     /* ── Моделі ──────────────────────────────────────────────────────── */
@@ -872,7 +878,7 @@ export const downloadAnalyticsGuidePDF = (sections: any[]) => {
                 columnStyles: { 0: { cellWidth: 26, fontStyle: 'bold' }, 2: { cellWidth: 56 } },
                 margin: { left: ML, right: MR },
             });
-            y = (pdf as any).lastAutoTable?.finalY + 3 ?? y + 30;
+            y = (pdf as any).lastAutoTable?.finalY ? (pdf as any).lastAutoTable.finalY + 3 : y + 30;
 
             // Таблиця результатів
             checkPage((model.results.length + 2) * 8);
@@ -890,7 +896,7 @@ export const downloadAnalyticsGuidePDF = (sections: any[]) => {
                 columnStyles: { 0: { cellWidth: 38, fontStyle: 'bold' } },
                 margin: { left: ML, right: MR },
             });
-            y = (pdf as any).lastAutoTable?.finalY + 3 ?? y + 25;
+            y = (pdf as any).lastAutoTable?.finalY ? (pdf as any).lastAutoTable.finalY + 3 : y + 25;
 
             // Примітка
             checkPage(10);

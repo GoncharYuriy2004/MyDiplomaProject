@@ -263,6 +263,7 @@ export const uk = {
     'procurement.form.product.placeholder': 'Оберіть товар...',
     'procurement.form.quantity': 'Кількість',
     'procurement.form.supplier': 'Постачальник',
+    'procurement.form.unitPrice': 'Ціна за одиницю (₴)',
     'procurement.form.btn.create': 'Створити чернетку PO',
     'procurement.msg.inStock': 'На складі',
     'procurement.msg.created': 'Замовлення створено!',

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useItems } from '../../context/ItemsContext';
 import { apiCreateDocument } from '../../utils/api';
 import { translateItemName, translateUnit } from '../../utils/translateItem';
+import { downloadDiscrepancyActPDF } from '../../utils/pdfGenerator';
 
 const InventoryCheck = () => {
     const { t, language } = useLanguage();
@@ -37,6 +38,7 @@ const InventoryCheck = () => {
                 expected:  p.current_stock,
                 actual:    actualStock[p._id],
                 diff:      actualStock[p._id] - p.current_stock,
+                unit_price: p.unit_price,
             }));
 
         if (checked.length === 0) {
@@ -56,6 +58,16 @@ const InventoryCheck = () => {
                 created_by:   user?._id || '',
                 discrepancies: checked,
             });
+
+            const pdfRows = checked.map(c => ({
+                sku:         c.sku || '—',
+                name:        c.item_name,
+                discrepancy: c.diff,
+                unitPrice:   c.unit_price != null ? Number(c.unit_price) : undefined,
+                type:        c.diff === 0 ? 'Норма' : c.diff > 0 ? 'Надлишок' : 'Нестача',
+                loggedBy:    user?.full_name || user?._id || '—',
+            }));
+            downloadDiscrepancyActPDF(pdfRows);
 
             if (discrepancyCount === 0) {
                 setSuccessMessage(`Акт інвентаризації по ${checked.length} позиціях сформовано. Розбіжностей не виявлено — всі залишки відповідають обліку.`);

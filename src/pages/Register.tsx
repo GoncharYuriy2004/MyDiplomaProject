@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { twMerge } from 'tailwind-merge';
@@ -10,7 +10,7 @@ import companyLogo from '../assets/logo.jpg';
 const Register = () => {
     const { t, language, setLanguage } = useLanguage();
     const { register } = useAuth();
-    const navigate = useNavigate();
+
 
     const [formData, setFormData] = useState({
         full_name: '',

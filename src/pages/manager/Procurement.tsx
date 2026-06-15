@@ -3,7 +3,7 @@ import { Plus, Clock, CheckCircle2, Truck, Trash2, Search, XCircle } from 'lucid
 import { useItems } from '../../context/ItemsContext';
 import { useSuppliers } from '../../context/SupplierContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { translateItemName } from '../../utils/translateItem';
+
 import {
     apiGetProcurement,
     apiCreateProcurement,
@@ -25,7 +25,7 @@ type Order = {
 };
 
 const Procurement = () => {
-    const { t, language } = useLanguage();
+    const { t } = useLanguage();
     const { items, refetch } = useItems();
     const { suppliers } = useSuppliers();
 
@@ -34,6 +34,7 @@ const Procurement = () => {
     const [selectedItemId, setSelectedItemId] = useState('');
     const [quantity, setQuantity] = useState('1');
     const [selectedSupplierId, setSelectedSupplierId] = useState('');
+    const [unitPrice, setUnitPrice] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -82,6 +83,8 @@ const Procurement = () => {
         const item = items.find(p => p._id === selectedItemId);
         if (!item) return;
         const supplier = suppliers.find(s => s._id === selectedSupplierId);
+        const price = parseFloat(unitPrice);
+        if (!unitPrice || isNaN(price) || price < 0) return;
 
         setSubmitting(true);
         try {
@@ -91,14 +94,15 @@ const Procurement = () => {
                 item_name:     item.name,
                 supplier_name: supplier?.name ?? '—',
                 quantity:      qty,
-                unit_price:    item.unit_price,
-                total:         qty * item.unit_price,
+                unit_price:    price,
+                total:         qty * price,
                 status:        'planned',
             });
             setOrders(prev => [created, ...prev]);
             setSelectedItemId('');
             setItemSearch('');
             setQuantity('1');
+            setUnitPrice('');
             setSelectedSupplierId('');
             setSupplierSearch('');
             showMessage(t('procurement.msg.created') || 'Замовлення створено!');
@@ -266,7 +270,7 @@ const Procurement = () => {
                                                 <button
                                                     key={i._id}
                                                     type="button"
-                                                    onMouseDown={e => { e.preventDefault(); setSelectedItemId(i._id); setItemSearch(''); setItemDropOpen(false); }}
+                                                    onMouseDown={e => { e.preventDefault(); setSelectedItemId(i._id); setItemSearch(''); setItemDropOpen(false); setUnitPrice(i.unit_price != null ? String(i.unit_price) : ''); }}
                                                     className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors"
                                                 >
                                                     <span className="font-medium">{i.name}</span>
@@ -325,6 +329,25 @@ const Procurement = () => {
                             </div>
                         </div>
 
+                        {/* Unit price */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">{t('procurement.form.unitPrice')}</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={unitPrice}
+                                onChange={e => setUnitPrice(e.target.value)}
+                                placeholder="0.00"
+                                className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            {unitPrice && quantity && !isNaN(parseFloat(unitPrice)) && !isNaN(parseFloat(quantity)) && (
+                                <p className="text-xs text-slate-400 mt-1">
+                                    Сума: <span className="font-semibold text-slate-600">{(parseFloat(unitPrice) * parseFloat(quantity)).toFixed(2)} ₴</span>
+                                </p>
+                            )}
+                        </div>
+
                         {successMessage && (
                             <div className="text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm font-medium">
                                 {successMessage}
@@ -339,7 +362,7 @@ const Procurement = () => {
                         <button
                             type="button"
                             onClick={handleCreateOrder}
-                            disabled={submitting || !selectedItemId}
+                            disabled={submitting || !selectedItemId || !unitPrice || isNaN(parseFloat(unitPrice))}
                             className="w-full bg-slate-800 text-white font-medium py-2 rounded-lg hover:bg-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             <Plus size={16} />

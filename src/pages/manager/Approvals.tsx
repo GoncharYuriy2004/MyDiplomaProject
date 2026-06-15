@@ -189,7 +189,7 @@ const Approvals = () => {
                                 </div>
                                 <div className="text-[11px] text-slate-500 font-mono space-y-0.5 pt-1">
                                     <p>Дата: {new Date(approvingDoc.created_at).toLocaleString('uk-UA')}</p>
-                                    <p>Відповідальний: <span className="font-semibold text-slate-700">{user?.full_name || user?.username || '—'}</span></p>
+                                    <p>Відповідальний: <span className="font-semibold text-slate-700">{user?.full_name || user?.login || '—'}</span></p>
                                     <p className="text-slate-600 pt-1">{getDocDetails(approvingDoc)}</p>
                                 </div>
                             </div>

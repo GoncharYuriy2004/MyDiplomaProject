@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLanguage } from '../../context/LanguageContext';
+
 import { apiGetUsers, apiActivateUser, apiDeactivateUser } from '../../utils/api';
 import { UserCheck, UserX, Clock, RefreshCw } from 'lucide-react';
 
@@ -33,7 +33,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default function UsersPage() {
-    const { t } = useLanguage();
+
     const [users, setUsers]       = useState<UserEntry[]>([]);
     const [loading, setLoading]   = useState(true);
     const [actionId, setActionId] = useState<string | null>(null);

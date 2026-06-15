@@ -5,7 +5,7 @@ import {
     ShoppingBag, ChevronRight, Search,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
+
 import { useItems } from '../../context/ItemsContext';
 import {
     apiGetDetailRequests,
@@ -34,7 +34,7 @@ function shortId(id: string | null | undefined) {
 type TabFilter = 'ALL' | 'CREATED' | 'APPROVED' | 'REJECTED';
 
 const DetailRequests = () => {
-    const { t } = useLanguage();
+
     const { user } = useAuth();
     const { items, updateItem, refetch } = useItems();
 

@@ -263,6 +263,7 @@ export const en = {
     'procurement.form.product.placeholder': 'Select a product...',
     'procurement.form.quantity': 'Quantity',
     'procurement.form.supplier': 'Supplier',
+    'procurement.form.unitPrice': 'Unit Price (₴)',
     'procurement.form.btn.create': 'Create Draft PO',
     'procurement.msg.inStock': 'In stock',
     'procurement.msg.created': 'Order created!',

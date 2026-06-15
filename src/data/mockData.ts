@@ -64,22 +64,28 @@ export type Document = {
     pdf_link?: string;
     total_sum?: number;
     total_vat?: number;
+    recipient?: string;
+    item_name?: string;
+    reason?: string;
+    notes?: string;
 };
 
 export const MOCK_USERS: User[] = [
     {
         _id: "u1",
-        username: "manager",
-        password_hash: "1234",
+        login: "manager",
         role: "manager",
-        full_name: "John Manager"
+        role_in_system: "WAREHOUSE_MANAGER",
+        full_name: "John Manager",
+        account_status: "ACTIVE"
     },
     {
         _id: "u2",
-        username: "worker",
-        password_hash: "1234",
+        login: "worker",
         role: "worker",
-        full_name: "Alice Worker"
+        role_in_system: "WAREHOUSE_WORKER",
+        full_name: "Alice Worker",
+        account_status: "ACTIVE"
     }
 ];
 

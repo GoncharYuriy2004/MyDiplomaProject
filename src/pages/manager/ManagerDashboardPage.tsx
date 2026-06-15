@@ -150,7 +150,7 @@ const ManagerDashboardPage = () => {
                             paddingAngle={5}
                             dataKey="qty"
                             nameKey="category"
-                            label={({ category, percent }) => `${category} ${(percent * 100).toFixed(0)}%`}
+                            label={(props: any) => `${props.name} ${((props.percent || 0) * 100).toFixed(0)}%`}
                         >
                             {pieData.map((_e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>

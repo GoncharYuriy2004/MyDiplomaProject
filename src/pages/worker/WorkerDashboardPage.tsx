@@ -27,7 +27,7 @@ const WorkerDashboardPage = () => {
         return matchSearch && matchStatus;
     });
 
-    const categories = [...new Set(items.map(i => i.status))];
+
 
     return (
         <div className="space-y-6">
@@ -76,13 +76,14 @@ const WorkerDashboardPage = () => {
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t('dashboard.tableSku')}</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t('dashboard.tableCategory')}</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t('dashboard.tableStatus')}</th>
+                                    <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase text-right">{t('mstock.table.price')}</th>
                                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase text-right">{t('dashboard.tableStock')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">
+                                        <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
                                             {t('dashboard.noResults')}
                                         </td>
                                     </tr>
@@ -99,6 +100,9 @@ const WorkerDashboardPage = () => {
                                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusColor[item.status] ?? 'bg-slate-100 text-slate-600'}`}>
                                                 {t(`status.${item.status}`) || item.status}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-700 text-right">
+                                            {item.unit_price != null ? `${item.unit_price.toFixed(2)} ₴` : '—'}
                                         </td>
                                         <td className="px-6 py-4 text-sm font-bold text-slate-800 text-right">
                                             {item.current_stock} {translateUnit(item.unit, language)}
