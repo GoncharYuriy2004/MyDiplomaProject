@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Undo2, UserCheck, ClipboardPenLine, CheckCircle2, FileText, FileDown } from 'lucide-react';
+import { Undo2, UserCheck, ClipboardPenLine, CheckCircle2, FileText, FileDown, Search, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useItems } from '../../context/ItemsContext';
@@ -23,6 +23,8 @@ const Returns = () => {
     const { items, updateItem, refetch } = useItems();
 
     const [selectedProduct, setSelectedProduct] = useState('');
+    const [itemSearch, setItemSearch] = useState('');
+    const [itemDropOpen, setItemDropOpen] = useState(false);
     const [quantity, setQuantity] = useState('');
     const [returnedFrom, setReturnedFrom] = useState('');
     const [notes, setNotes] = useState('');
@@ -46,6 +48,25 @@ const Returns = () => {
     }, []);
 
     const selectedProductData = items.find(p => p._id === selectedProduct);
+
+    const filteredItems = items.filter(p =>
+        !itemSearch ||
+        translateItemName(p.name, language).toLowerCase().includes(itemSearch.toLowerCase()) ||
+        p.sku.toLowerCase().includes(itemSearch.toLowerCase())
+    );
+
+    const selectItem = (id: string) => {
+        const it = items.find(i => i._id === id);
+        setSelectedProduct(id);
+        setItemSearch(it ? `${translateItemName(it.name, language)} (${it.sku})` : '');
+        setItemDropOpen(false);
+    };
+
+    const clearItem = () => {
+        setSelectedProduct('');
+        setItemSearch('');
+        setItemDropOpen(true);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -95,6 +116,7 @@ const Returns = () => {
             setTimeout(() => setSuccessMessage(''), 5000);
 
             setSelectedProduct('');
+            setItemSearch('');
             setQuantity('');
             setReturnedFrom('');
             setNotes('');
@@ -126,21 +148,45 @@ const Returns = () => {
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
-                        <div>
+                        <div className="relative">
                             <label className="block text-sm font-medium text-slate-700 mb-1">{t('returns.field.item')}</label>
-                            <select
-                                required
-                                value={selectedProduct}
-                                onChange={(e) => setSelectedProduct(e.target.value)}
-                                className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
-                            >
-                                <option value="" disabled>{t('returns.placeholder.item')}</option>
-                                {items.map(p => (
-                                    <option key={p._id} value={p._id}>
-                                        {translateItemName(p.name, language)} (SKU: {p.sku}) — {p.current_stock} {translateUnit(p.unit, language)} {t('returns.inStock')}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={itemSearch}
+                                    onChange={e => { setItemSearch(e.target.value); setSelectedProduct(''); setItemDropOpen(true); }}
+                                    onFocus={() => setItemDropOpen(true)}
+                                    onBlur={() => setTimeout(() => setItemDropOpen(false), 150)}
+                                    placeholder={t('returns.placeholder.item')}
+                                    className="block w-full pl-9 pr-9 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
+                                />
+                                {selectedProduct && (
+                                    <button type="button" onMouseDown={clearItem}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                        <XCircle size={15} />
+                                    </button>
+                                )}
+                            </div>
+                            {itemDropOpen && (
+                                <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                                    {filteredItems.length === 0 ? (
+                                        <p className="text-xs text-slate-400 text-center py-4">Нічого не знайдено</p>
+                                    ) : filteredItems.map(p => (
+                                        <button key={p._id} type="button"
+                                            onMouseDown={() => selectItem(p._id)}
+                                            className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 transition-colors flex items-center justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-slate-800 truncate">{translateItemName(p.name, language)}</p>
+                                                <p className="text-[11px] text-slate-400 font-mono">{p.sku}</p>
+                                            </div>
+                                            <span className="text-[11px] font-bold shrink-0 px-1.5 py-0.5 rounded bg-teal-50 text-teal-700">
+                                                {p.current_stock} {translateUnit(p.unit, language)}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
