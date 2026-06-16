@@ -33,6 +33,16 @@ const Acts = () => {
         try { await refetch(); } finally { setRefreshing(false); }
     };
 
+    const getDocType = (type: string) => {
+        switch (type) {
+            case 'issuing':         return t('acts.type.issuing');
+            case 'invoice':         return t('acts.type.invoice');
+            case 'act_writeoff':    return t('acts.type.writeOff');
+            case 'discrepancy_act': return t('acts.type.discrepancy');
+            default:                return t('acts.type.default');
+        }
+    };
+
     const filteredDocs = documents.filter(doc => {
         const matchType = activeFilter === 'all' || doc.type === activeFilter;
         if (!matchType) return false;
@@ -89,16 +99,6 @@ const Acts = () => {
             case 'act_writeoff':    return 'bg-orange-50 text-orange-600';
             case 'discrepancy_act': return 'bg-purple-50 text-purple-600';
             default:                return 'bg-blue-50 text-blue-600';
-        }
-    };
-
-    const getDocType = (type: string) => {
-        switch (type) {
-            case 'issuing':         return t('acts.type.issuing');
-            case 'invoice':         return t('acts.type.invoice');
-            case 'act_writeoff':    return t('acts.type.writeOff');
-            case 'discrepancy_act': return t('acts.type.discrepancy');
-            default:                return t('acts.type.default');
         }
     };
 

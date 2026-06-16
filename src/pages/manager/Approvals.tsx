@@ -61,6 +61,11 @@ const Approvals = () => {
         finally { setBusy(false); }
     };
 
+    const getDocTypeName = (type: string) => {
+        if (type === 'discrepancy_act') return 'Акт інвентаризації';
+        return 'Запит на списання';
+    };
+
     const pendingDocs = documents.filter(doc => {
         const isPending = doc.status === 'pending' && (doc.type === 'act_writeoff' || doc.type === 'discrepancy_act');
         if (!isPending) return false;
@@ -122,11 +127,6 @@ const Approvals = () => {
     const getDocIconBg = (type: string) => {
         if (type === 'discrepancy_act') return 'bg-purple-50 text-purple-500';
         return 'bg-amber-50 text-amber-500';
-    };
-
-    const getDocTypeName = (type: string) => {
-        if (type === 'discrepancy_act') return 'Акт інвентаризації';
-        return 'Запит на списання';
     };
 
     const getDocDetails = (doc: any) => {
